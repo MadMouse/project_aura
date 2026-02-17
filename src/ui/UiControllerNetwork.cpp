@@ -463,7 +463,7 @@ void UiController::update_mqtt_ui() {
     // Update QR code - show only when WiFi is connected.
     if (objects.qrcode_mqtt_portal) {
         if (wifi_ready) {
-            String mqtt_url = UiText::MqttPortalUrl();
+            String mqtt_url = networkManager.localUrl("/mqtt");
             lv_obj_clear_flag(objects.qrcode_mqtt_portal, LV_OBJ_FLAG_HIDDEN);
             lv_qrcode_update(objects.qrcode_mqtt_portal, mqtt_url.c_str(), mqtt_url.length());
         } else {
@@ -493,7 +493,13 @@ void UiController::update_mqtt_ui() {
 void UiController::update_mqtt_texts() {
     if (objects.label_mqtt_title) safe_label_set_text(objects.label_mqtt_title, UiText::LabelMqttSettingsTitle());
     if (objects.label_mqtt_status) safe_label_set_text(objects.label_mqtt_status, UiText::LabelMqttStatus());
-    if (objects.label_mqtt_help) safe_label_set_text(objects.label_mqtt_help, UiText::LabelMqttHelp());
+    if (objects.label_mqtt_help) {
+        String help_text = UiText::LabelMqttHelp();
+        const String mqtt_url = networkManager.localUrl("/mqtt");
+        help_text.replace(UiText::MqttPortalUrl(), mqtt_url);
+        help_text.replace("http://aura.local/mqtt", mqtt_url);
+        safe_label_set_text(objects.label_mqtt_help, help_text.c_str());
+    }
     if (objects.label_mqtt_device_ip) safe_label_set_text(objects.label_mqtt_device_ip, UiText::LabelMqttDeviceIp());
     if (objects.label_mqtt_broker) safe_label_set_text(objects.label_mqtt_broker, UiText::LabelMqttBroker());
     if (objects.label_mqtt_topic) safe_label_set_text(objects.label_mqtt_topic, UiText::LabelMqttTopic());

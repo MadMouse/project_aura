@@ -9,6 +9,7 @@
 #include <stdio.h>
 
 #include "ui/UiText.h"
+#include "modules/NetworkManager.h"
 #include "ui/ui.h"
 
 #ifndef APP_VERSION
@@ -168,7 +169,13 @@ void UiController::update_theme_texts() {
     if (objects.label_btn_theme_custom) safe_label_set_text(objects.label_btn_theme_custom, UiText::LabelThemeCustom());
     if (objects.label_btn_theme_presets) safe_label_set_text(objects.label_btn_theme_presets, UiText::LabelThemePresets());
     if (objects.label_theme_preview_title) safe_label_set_text(objects.label_theme_preview_title, UiText::LabelThemeExample());
-    if (objects.label_theme_custom_text) safe_label_set_text(objects.label_theme_custom_text, UiText::LabelThemeCustomInfo());
+    if (objects.label_theme_custom_text) {
+        String custom_info = UiText::LabelThemeCustomInfo();
+        const String theme_url = networkManager.localUrl("/theme");
+        custom_info.replace(UiText::ThemePortalUrl(), theme_url);
+        custom_info.replace("http://aura.local/theme", theme_url);
+        safe_label_set_text(objects.label_theme_custom_text, custom_info.c_str());
+    }
     if (objects.label_theme_preview_hum_title) safe_label_set_text(objects.label_theme_preview_hum_title, UiText::LabelHumidityTitle());
 }
 

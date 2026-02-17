@@ -1173,7 +1173,8 @@ void UiController::update_settings_header() {
 void UiController::update_theme_custom_info(bool presets) {
     set_visible(objects.container_theme_custom_info, !presets);
     if (!presets && objects.qrcode_theme_custom) {
-        lv_qrcode_update(objects.qrcode_theme_custom, UiText::ThemePortalUrl(), strlen(UiText::ThemePortalUrl()));
+        const String theme_url = networkManager.localUrl("/theme");
+        lv_qrcode_update(objects.qrcode_theme_custom, theme_url.c_str(), theme_url.length());
     }
 }
 

@@ -359,7 +359,7 @@ void UiController::update_dac_ui(uint32_t now_ms) {
     if (ap_mode) {
         dac_url = "http://192.168.4.1/dac";
     } else if (wifi_connected) {
-        dac_url = "http://aura.local/dac";
+        dac_url = networkManager.localUrl("/dac");
     }
     if (objects.label_dac_qr_link) {
         if (!dac_url.isEmpty()) {
