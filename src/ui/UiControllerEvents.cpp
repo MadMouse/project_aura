@@ -777,14 +777,16 @@ void UiController::on_dp_info_event(lv_event_t *e) {
 }
 
 void UiController::on_pm10_info_event(lv_event_t *e) {
-    if (lv_event_get_code(e) != LV_EVENT_CLICKED) {
+    const lv_event_code_t code = lv_event_get_code(e);
+    if (code != LV_EVENT_CLICKED && code != LV_EVENT_VALUE_CHANGED) {
         return;
     }
     select_pm_info(INFO_PM10);
 }
 
 void UiController::on_pm1_info_event(lv_event_t *e) {
-    if (lv_event_get_code(e) != LV_EVENT_CLICKED) {
+    const lv_event_code_t code = lv_event_get_code(e);
+    if (code != LV_EVENT_CLICKED && code != LV_EVENT_VALUE_CHANGED) {
         return;
     }
     select_pm_info(INFO_PM1);

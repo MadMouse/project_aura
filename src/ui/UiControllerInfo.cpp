@@ -535,6 +535,10 @@ void UiController::select_pm_info(InfoSensor sensor) {
     set_visible(objects.pm_info, true);
     const bool pm1_pm10_group = (sensor == INFO_PM1) || (sensor == INFO_PM10);
     set_visible(objects.pm1_pm10_info, pm1_pm10_group);
+    set_visible(objects.pm05_info, sensor == INFO_PM05);
+    set_visible(objects.pm25_info, sensor == INFO_PM25);
+    set_visible(objects.pm10_info, sensor == INFO_PM10);
+    set_visible(objects.pm1_info, sensor == INFO_PM1);
     if (pm1_pm10_group) {
         auto set_checked = [](lv_obj_t *btn, bool checked) {
             if (!btn) return;
@@ -543,11 +547,10 @@ void UiController::select_pm_info(InfoSensor sensor) {
         };
         set_checked(objects.btn_pm10_info, sensor == INFO_PM10);
         set_checked(objects.btn_pm1_info, sensor == INFO_PM1);
+        // Keep PM tab buttons above PM1/PM10 content layers so they remain clickable.
+        if (objects.btn_pm10_info) lv_obj_move_foreground(objects.btn_pm10_info);
+        if (objects.btn_pm1_info) lv_obj_move_foreground(objects.btn_pm1_info);
     }
-    set_visible(objects.pm05_info, sensor == INFO_PM05);
-    set_visible(objects.pm25_info, sensor == INFO_PM25);
-    set_visible(objects.pm10_info, sensor == INFO_PM10);
-    set_visible(objects.pm1_info, sensor == INFO_PM1);
 
     if (objects.label_sensor_info_title) {
         if (sensor == INFO_PM05) {
