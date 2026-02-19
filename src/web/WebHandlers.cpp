@@ -85,6 +85,20 @@ bool parse_hex_color(const String &value, lv_color_t &out) {
     return true;
 }
 
+bool has_control_chars(const String &value) {
+    for (size_t i = 0; i < value.length(); i++) {
+        uint8_t c = static_cast<uint8_t>(value[i]);
+        if (c < 32 || c == 127) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool mqtt_topic_has_wildcards(const String &topic) {
+    return topic.indexOf('#') >= 0 || topic.indexOf('+') >= 0;
+}
+
 const char *dac_status_text(const FanControl &fan) {
     if (fan.isFaulted()) {
         return "FAULT";
@@ -363,6 +377,18 @@ void mqtt_handle_save() {
 
     if (topic.isEmpty()) {
         server.send(400, "text/plain", "Base topic required");
+        return;
+    }
+
+    if (has_control_chars(host) || has_control_chars(user) ||
+        has_control_chars(pass) || has_control_chars(name) ||
+        has_control_chars(topic)) {
+        server.send(400, "text/plain", "Fields contain unsupported control characters");
+        return;
+    }
+
+    if (mqtt_topic_has_wildcards(topic)) {
+        server.send(400, "text/plain", "Base topic must not include MQTT wildcards (+ or #)");
         return;
     }
 

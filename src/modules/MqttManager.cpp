@@ -27,6 +27,38 @@ constexpr size_t kTopicBufferSize = 256;
 constexpr uint32_t kMqttMdnsSuccessCacheMs = 5UL * 60UL * 1000UL;
 constexpr uint32_t kMqttMdnsFailureCacheMs = 60UL * 1000UL;
 
+void append_json_escaped(String &out, const char *value) {
+    if (!value) {
+        return;
+    }
+    const uint8_t *p = reinterpret_cast<const uint8_t *>(value);
+    while (*p) {
+        switch (*p) {
+            case '"': out += "\\\""; break;
+            case '\\': out += "\\\\"; break;
+            case '\b': out += "\\b"; break;
+            case '\f': out += "\\f"; break;
+            case '\n': out += "\\n"; break;
+            case '\r': out += "\\r"; break;
+            case '\t': out += "\\t"; break;
+            default:
+                if (*p < 0x20) {
+                    char buf[7];
+                    snprintf(buf, sizeof(buf), "\\u%04X", static_cast<unsigned>(*p));
+                    out += buf;
+                } else {
+                    out += static_cast<char>(*p);
+                }
+                break;
+        }
+        ++p;
+    }
+}
+
+void append_json_escaped(String &out, const String &value) {
+    append_json_escaped(out, value.c_str());
+}
+
 uint8_t retry_stage_for_attempts(uint32_t attempts) {
     return static_cast<uint8_t>(attempts / kMqttRetryStageAttempts);
 }
@@ -250,18 +282,18 @@ void MqttManager::publishDiscoverySensor(const char *object_id, const char *name
     payload.reserve(520); // Discovery sensor payload ~450 bytes; keep headroom for long IDs.
     payload = "{";
     payload += "\"name\":\"";
-    payload += name;
+    append_json_escaped(payload, name);
     payload += "\",\"unique_id\":\"";
-    payload += mqtt_device_id_;
+    append_json_escaped(payload, mqtt_device_id_);
     payload += "_";
-    payload += object_id;
+    append_json_escaped(payload, object_id);
     payload += "\",\"state_topic\":\"";
     char topic[kTopicBufferSize];
     build_state_topic(topic, sizeof(topic), mqtt_base_topic_);
-    payload += topic;
+    append_json_escaped(payload, topic);
     payload += "\",\"availability_topic\":\"";
     build_availability_topic(topic, sizeof(topic), mqtt_base_topic_);
-    payload += topic;
+    append_json_escaped(payload, topic);
     payload += "\",\"payload_available\":\"";
     payload += Config::MQTT_AVAIL_ONLINE;
     payload += "\",\"payload_not_available\":\"";
@@ -269,7 +301,7 @@ void MqttManager::publishDiscoverySensor(const char *object_id, const char *name
     payload += "\"";
     if (value_template && value_template[0] != '\0') {
         payload += ",\"value_template\":\"";
-        payload += value_template;
+        append_json_escaped(payload, value_template);
         payload += "\"";
     }
     if (unit && unit[0] != '\0') {
@@ -289,13 +321,13 @@ void MqttManager::publishDiscoverySensor(const char *object_id, const char *name
     }
     if (icon && icon[0] != '\0') {
         payload += ",\"icon\":\"";
-        payload += icon;
+        append_json_escaped(payload, icon);
         payload += "\"";
     }
     payload += ",\"device\":{\"identifiers\":[\"";
-    payload += mqtt_device_id_;
+    append_json_escaped(payload, mqtt_device_id_);
     payload += "\"],\"name\":\"";
-    payload += mqtt_device_name_;
+    append_json_escaped(payload, mqtt_device_name_);
     payload += "\",\"manufacturer\":\"21CNCStudio\",\"model\":\"Project Aura\"}";
     payload += "}";
 
@@ -312,29 +344,29 @@ void MqttManager::publishDiscoverySwitch(const char *object_id, const char *name
     payload.reserve(640); // Switch payload includes availability array; keep headroom.
     payload = "{";
     payload += "\"name\":\"";
-    payload += name;
+    append_json_escaped(payload, name);
     payload += "\",\"unique_id\":\"";
-    payload += mqtt_device_id_;
+    append_json_escaped(payload, mqtt_device_id_);
     payload += "_";
-    payload += object_id;
+    append_json_escaped(payload, object_id);
     payload += "\",\"state_topic\":\"";
     char topic[kTopicBufferSize];
     build_state_topic(topic, sizeof(topic), mqtt_base_topic_);
-    payload += topic;
+    append_json_escaped(payload, topic);
     payload += "\",\"command_topic\":\"";
     build_command_topic(topic, sizeof(topic), mqtt_base_topic_, object_id);
-    payload += topic;
+    append_json_escaped(payload, topic);
     if (strcmp(object_id, "night_mode") == 0) {
         payload += "\",\"availability\":[{\"topic\":\"";
         build_availability_topic(topic, sizeof(topic), mqtt_base_topic_);
-        payload += topic;
+        append_json_escaped(payload, topic);
         payload += "\",\"payload_available\":\"";
         payload += Config::MQTT_AVAIL_ONLINE;
         payload += "\",\"payload_not_available\":\"";
         payload += Config::MQTT_AVAIL_OFFLINE;
         payload += "\"},{\"topic\":\"";
         build_night_mode_availability_topic(topic, sizeof(topic), mqtt_base_topic_);
-        payload += topic;
+        append_json_escaped(payload, topic);
         payload += "\",\"payload_available\":\"";
         payload += Config::MQTT_AVAIL_ONLINE;
         payload += "\",\"payload_not_available\":\"";
@@ -344,7 +376,7 @@ void MqttManager::publishDiscoverySwitch(const char *object_id, const char *name
     } else {
         payload += "\",\"availability_topic\":\"";
         build_availability_topic(topic, sizeof(topic), mqtt_base_topic_);
-        payload += topic;
+        append_json_escaped(payload, topic);
         payload += "\",\"payload_available\":\"";
         payload += Config::MQTT_AVAIL_ONLINE;
         payload += "\",\"payload_not_available\":\"";
@@ -355,18 +387,18 @@ void MqttManager::publishDiscoverySwitch(const char *object_id, const char *name
     payload += ",\"state_on\":\"ON\",\"state_off\":\"OFF\"";
     if (value_template && value_template[0] != '\0') {
         payload += ",\"value_template\":\"";
-        payload += value_template;
+        append_json_escaped(payload, value_template);
         payload += "\"";
     }
     if (icon && icon[0] != '\0') {
         payload += ",\"icon\":\"";
-        payload += icon;
+        append_json_escaped(payload, icon);
         payload += "\"";
     }
     payload += ",\"device\":{\"identifiers\":[\"";
-    payload += mqtt_device_id_;
+    append_json_escaped(payload, mqtt_device_id_);
     payload += "\"],\"name\":\"";
-    payload += mqtt_device_name_;
+    append_json_escaped(payload, mqtt_device_name_);
     payload += "\",\"manufacturer\":\"21CNCStudio\",\"model\":\"Project Aura\"}";
     payload += "}";
 
@@ -383,30 +415,30 @@ void MqttManager::publishDiscoveryButton(const char *object_id, const char *name
     payload.reserve(420); // Button payload is smaller but still avoid reallocs.
     payload = "{";
     payload += "\"name\":\"";
-    payload += name;
+    append_json_escaped(payload, name);
     payload += "\",\"unique_id\":\"";
-    payload += mqtt_device_id_;
+    append_json_escaped(payload, mqtt_device_id_);
     payload += "_";
-    payload += object_id;
+    append_json_escaped(payload, object_id);
     payload += "\",\"command_topic\":\"";
     char topic[kTopicBufferSize];
     build_command_topic(topic, sizeof(topic), mqtt_base_topic_, object_id);
-    payload += topic;
+    append_json_escaped(payload, topic);
     payload += "\",\"payload_press\":\"";
-    payload += payload_press;
+    append_json_escaped(payload, payload_press);
     payload += "\",\"availability_topic\":\"";
     build_availability_topic(topic, sizeof(topic), mqtt_base_topic_);
-    payload += topic;
+    append_json_escaped(payload, topic);
     payload += "\"";
     if (icon && icon[0] != '\0') {
         payload += ",\"icon\":\"";
-        payload += icon;
+        append_json_escaped(payload, icon);
         payload += "\"";
     }
     payload += ",\"device\":{\"identifiers\":[\"";
-    payload += mqtt_device_id_;
+    append_json_escaped(payload, mqtt_device_id_);
     payload += "\"],\"name\":\"";
-    payload += mqtt_device_name_;
+    append_json_escaped(payload, mqtt_device_name_);
     payload += "\",\"manufacturer\":\"21CNCStudio\",\"model\":\"Project Aura\"}";
     payload += "}";
 
