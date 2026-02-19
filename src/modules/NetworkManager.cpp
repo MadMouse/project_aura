@@ -417,6 +417,7 @@ void AuraNetworkManager::poll() {
         }
         server_.handleClient();
     }
+    WebHandlersPollDeferred();
     notifyStateChangeIfNeeded();
 }
 

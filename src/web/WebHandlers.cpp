@@ -24,9 +24,18 @@
 namespace {
 
 WebHandlerContext *g_ctx = nullptr;
+constexpr uint32_t kDeferredActionDelayMs = 200;
+bool g_deferred_wifi_start_sta = false;
+bool g_deferred_mqtt_sync = false;
+uint32_t g_deferred_wifi_start_sta_due_ms = 0;
+uint32_t g_deferred_mqtt_sync_due_ms = 0;
 
 WebHandlerContext *ctx() {
     return g_ctx;
+}
+
+bool deadline_reached(uint32_t now_ms, uint32_t due_ms) {
+    return static_cast<int32_t>(now_ms - due_ms) >= 0;
 }
 
 String html_escape(const String &input) {
@@ -113,6 +122,34 @@ const char *dac_status_text(const FanControl &fan) {
 
 void WebHandlersInit(WebHandlerContext *context) {
     g_ctx = context;
+    g_deferred_wifi_start_sta = false;
+    g_deferred_mqtt_sync = false;
+    g_deferred_wifi_start_sta_due_ms = 0;
+    g_deferred_mqtt_sync_due_ms = 0;
+}
+
+void WebHandlersPollDeferred() {
+    WebHandlerContext *context = ctx();
+    if (!context) {
+        return;
+    }
+    const uint32_t now_ms = millis();
+
+    if (g_deferred_wifi_start_sta && deadline_reached(now_ms, g_deferred_wifi_start_sta_due_ms)) {
+        g_deferred_wifi_start_sta = false;
+        g_deferred_wifi_start_sta_due_ms = 0;
+        if (context->wifi_start_sta) {
+            context->wifi_start_sta();
+        }
+    }
+
+    if (g_deferred_mqtt_sync && deadline_reached(now_ms, g_deferred_mqtt_sync_due_ms)) {
+        g_deferred_mqtt_sync = false;
+        g_deferred_mqtt_sync_due_ms = 0;
+        if (context->mqtt_sync_with_wifi) {
+            context->mqtt_sync_with_wifi();
+        }
+    }
 }
 
 bool wifi_is_ascii_printable(const String &value, size_t max_len) {
@@ -242,10 +279,8 @@ void wifi_handle_save() {
 
     String html = FPSTR(WebTemplates::kWifiSavePage);
     server.send(200, "text/html", html);
-    delay(200);
-    if (context->wifi_start_sta) {
-        context->wifi_start_sta();
-    }
+    g_deferred_wifi_start_sta = true;
+    g_deferred_wifi_start_sta_due_ms = millis() + kDeferredActionDelayMs;
 }
 
 void wifi_handle_not_found() {
@@ -429,11 +464,8 @@ void mqtt_handle_save() {
 
     String html = FPSTR(WebTemplates::kMqttSavePage);
     server.send(200, "text/html", html);
-
-    delay(200);
-    if (context->mqtt_sync_with_wifi) {
-        context->mqtt_sync_with_wifi();
-    }
+    g_deferred_mqtt_sync = true;
+    g_deferred_mqtt_sync_due_ms = millis() + kDeferredActionDelayMs;
 }
 
 void theme_handle_root() {
@@ -536,9 +568,15 @@ void theme_handle_apply() {
     colors.gradient_direction = colors.gradient_enabled ? LV_GRAD_DIR_VER : LV_GRAD_DIR_NONE;
     colors.shadow_enabled = true;
 
-    lvgl_port_lock(-1);
+    if (!lvgl_port_lock(-1)) {
+        server.send(503, "text/plain", "LVGL unavailable");
+        return;
+    }
     context->theme_manager->applyPreviewCustom(colors);
-    lvgl_port_unlock();
+    if (!lvgl_port_unlock()) {
+        server.send(500, "text/plain", "LVGL unlock failed");
+        return;
+    }
 
     server.send(200, "text/plain", "OK");
 }
