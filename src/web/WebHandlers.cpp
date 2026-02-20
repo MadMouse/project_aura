@@ -345,13 +345,16 @@ void dashboard_handle_root() {
         return;
     }
 
-    // Keep captive-portal setup flow intact in AP mode.
-    if (context->wifi_is_ap_mode && context->wifi_is_ap_mode()) {
+    const bool ap_mode = context->wifi_is_ap_mode && context->wifi_is_ap_mode();
+    const String uri = context->server->uri();
+
+    // Keep captive-portal setup flow intact on AP root.
+    if (ap_mode && uri == "/") {
         wifi_handle_root();
         return;
     }
 
-    if (context->wifi_is_connected && !context->wifi_is_connected()) {
+    if (!ap_mode && context->wifi_is_connected && !context->wifi_is_connected()) {
         context->server->send(404, "text/plain", "Not found");
         return;
     }

@@ -53,7 +53,7 @@ const char kDashboardPageTemplate[] PROGMEM = R"HTML_DASH(
 /*__INLINE_APP_START__*/
 // Auto-generated from web-page.ini.
 // Run .\sync-preview.ps1 after editing web-page.ini.
-const { useState, useMemo } = React;
+const { useState, useMemo, useEffect } = React;
 const { XAxis, YAxis, ResponsiveContainer, Tooltip, AreaChart, Area, CartesianGrid } = Recharts;
 
 const iconBaseProps = {

@@ -62,7 +62,7 @@ void UiController::update_settings_texts() {
             "Then scan the QR code or open this link:");
     }
     if (objects.container_web_page_link) {
-        safe_label_set_text(objects.container_web_page_link, networkManager.localUrl("/wifi").c_str());
+        safe_label_set_text(objects.container_web_page_link, networkManager.localUrl("/dashboard").c_str());
     }
     if (objects.label_btn_units_led_indicators) safe_label_set_text(objects.label_btn_units_led_indicators, UiText::LabelLedIndicators());
     if (objects.label_btn_alert_blink) safe_label_set_text(objects.label_btn_alert_blink, UiText::LabelAlertBlink());

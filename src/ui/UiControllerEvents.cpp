@@ -229,9 +229,9 @@ void UiController::on_web_page_event(lv_event_t *e) {
     const AuraNetworkManager::WifiState wifi_state = networkManager.state();
     String web_url;
     if (wifi_enabled && wifi_state == AuraNetworkManager::WIFI_STATE_AP_CONFIG) {
-        web_url = "http://192.168.4.1/wifi";
+        web_url = "http://192.168.4.1/dashboard";
     } else if (wifi_enabled && wifi_state == AuraNetworkManager::WIFI_STATE_STA_CONNECTED) {
-        web_url = networkManager.localUrl("/wifi");
+        web_url = networkManager.localUrl("/dashboard");
     }
 
     if (objects.container_web_page_link) {
