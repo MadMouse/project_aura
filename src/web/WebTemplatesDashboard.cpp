@@ -101,8 +101,8 @@ const char kDashboardPageTemplate[] PROGMEM = R"HTML_DASH(
   </script>
   <script type="text/babel" data-presets="react">
 /*__INLINE_APP_START__*/
-// Auto-generated from web-page.ini.
-// Run .\sync-preview.ps1 after editing web-page.ini.
+// Dashboard web UI template embedded into firmware.
+// Edit this file directly.
 const { useState, useMemo, useEffect } = React;
 
 const iconBaseProps = {
