@@ -1192,6 +1192,17 @@ const TabIcon = ({ id }) => {
     );
   }
 
+  if (id === "system") {
+    return (
+      <svg viewBox="0 0 24 24" className={base} aria-hidden="true">
+        <rect {...stroke} x="4.5" y="5" width="15" height="10.5" rx="2.2" />
+        <path {...stroke} d="M8 9h5M8 11.8h7" />
+        <circle {...stroke} cx="16.2" cy="9.4" r="1.2" />
+        <path {...stroke} d="M9 19h6M12 15.5V19" />
+      </svg>
+    );
+  }
+
   return (
     <svg viewBox="0 0 24 24" className={base} aria-hidden="true">
       <path {...stroke} d="M4 7h16" />
@@ -1778,6 +1789,7 @@ function AuraDashboard() {
     { id: 'charts', label: 'Charts' },
     { id: 'events', label: 'Events' },
     { id: 'settings', label: 'Settings' },
+    { id: 'system', label: 'System' },
   ];
 
   return (
@@ -2081,79 +2093,86 @@ function AuraDashboard() {
                 </div>
               </SettingGroup>
 
-              <SettingGroup title="System">
-                <div className="space-y-1">
-                  <SettingInfoRow label="Firmware" value={firmwareVersion} valueClassName="text-gray-200 text-sm" mono />
-                  <SettingInfoRow label="Build" value={firmwareBuild} valueClassName="text-gray-300 text-sm" mono />
-                  <SettingInfoRow label="Uptime" value={uptime} valueClassName="text-gray-200 text-sm" mono />
-                  <SettingInfoRow label="Web URL" value={localWebUrl} valueClassName="text-cyan-300 text-sm" mono />
-                </div>
-                <div className="mt-3 pt-3 border-t border-gray-700/60">
-                  <div className="text-gray-400 text-[11px] font-bold uppercase tracking-wider mb-2">
-                    Firmware Update
-                  </div>
-                  <input
-                    ref={otaFileInputRef}
-                    type="file"
-                    accept=".bin"
-                    onChange={selectFirmwareFile}
-                    disabled={otaUploadState === 'uploading'}
-                    className="block w-full text-xs text-gray-300 file:mr-3 file:rounded-md file:border file:border-gray-600 file:bg-gray-800 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-gray-200 hover:file:bg-gray-700 disabled:opacity-60 disabled:cursor-not-allowed"
-                  />
-                  <button
-                    onClick={uploadFirmware}
-                    disabled={!otaFile || otaUploadState === 'uploading'}
-                    className={`w-full mt-2 border py-2.5 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-colors ${
-                      !otaFile || otaUploadState === 'uploading'
-                        ? 'bg-gray-800/70 text-gray-500 border-gray-700 cursor-not-allowed'
-                        : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/40'
-                    }`}
-                  >
-                    <UploadIcon size={14} />
-                    {otaUploadState === 'uploading' ? 'Uploading...' : 'Update Firmware'}
-                  </button>
-                  {otaUploadState === 'uploading' && (
-                    <div className="mt-2">
-                      <div className="h-1.5 rounded-full bg-gray-800 border border-gray-700 overflow-hidden">
-                        <div
-                          className="h-full bg-amber-400 transition-all duration-150"
-                          style={{ width: `${otaUploadProgress}%` }}
-                        />
-                      </div>
-                      <div className="mt-1 text-[11px] text-amber-300/90 text-right">{otaUploadProgress}%</div>
-                    </div>
-                  )}
-                  {otaUploadMessage && (
-                    <div
-                      className={`mt-2 text-[11px] ${
-                        otaUploadState === 'success'
-                          ? 'text-emerald-300/90'
-                          : otaUploadState === 'error'
-                            ? 'text-red-300/90'
-                            : 'text-gray-400'
-                      }`}
-                    >
-                      {otaUploadMessage}
-                    </div>
-                  )}
-                </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'system' && (
+        <div className="space-y-3 md:space-y-4 animate-in fade-in duration-300">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4 items-start">
+            <SettingGroup title="System">
+              <div className="space-y-1">
+                <SettingInfoRow label="Firmware" value={firmwareVersion} valueClassName="text-gray-200 text-sm" mono />
+                <SettingInfoRow label="Build" value={firmwareBuild} valueClassName="text-gray-300 text-sm" mono />
+                <SettingInfoRow label="Uptime" value={uptime} valueClassName="text-gray-200 text-sm" mono />
+                <SettingInfoRow label="Web URL" value={localWebUrl} valueClassName="text-cyan-300 text-sm" mono />
+              </div>
+              <div className="mt-3 pt-3 border-t border-gray-700/60 space-y-2">
                 <button
                   onClick={requestRestart}
                   disabled={otaUploadState === 'uploading'}
-                  className="w-full mt-2 border py-2.5 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/40 transition-colors"
+                  className="w-full border py-2.5 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/40 transition-colors"
                 >
                   <RotateCw size={14} /> Reboot Device
                 </button>
                 {dacAvailable && (
                   <button
                     onClick={() => { window.location.href = '/dac'; }}
-                    className="w-full mt-2 border py-2.5 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-colors"
+                    className="w-full border py-2.5 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-colors"
                   >
                     DAC Settings
                   </button>
                 )}
-              </SettingGroup>
-            </div>
+              </div>
+            </SettingGroup>
+
+            <SettingGroup title="Firmware Update">
+              <input
+                ref={otaFileInputRef}
+                type="file"
+                accept=".bin"
+                onChange={selectFirmwareFile}
+                disabled={otaUploadState === 'uploading'}
+                className="block w-full text-xs text-gray-300 file:mr-3 file:rounded-md file:border file:border-gray-600 file:bg-gray-800 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-gray-200 hover:file:bg-gray-700 disabled:opacity-60 disabled:cursor-not-allowed"
+              />
+              <button
+                onClick={uploadFirmware}
+                disabled={!otaFile || otaUploadState === 'uploading'}
+                className={`w-full mt-2 border py-2.5 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-colors ${
+                  !otaFile || otaUploadState === 'uploading'
+                    ? 'bg-gray-800/70 text-gray-500 border-gray-700 cursor-not-allowed'
+                    : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/40'
+                }`}
+              >
+                <UploadIcon size={14} />
+                {otaUploadState === 'uploading' ? 'Uploading...' : 'Update Firmware'}
+              </button>
+              {otaUploadState === 'uploading' && (
+                <div className="mt-2">
+                  <div className="h-1.5 rounded-full bg-gray-800 border border-gray-700 overflow-hidden">
+                    <div
+                      className="h-full bg-amber-400 transition-all duration-150"
+                      style={{ width: `${otaUploadProgress}%` }}
+                    />
+                  </div>
+                  <div className="mt-1 text-[11px] text-amber-300/90 text-right">{otaUploadProgress}%</div>
+                </div>
+              )}
+              {otaUploadMessage && (
+                <div
+                  className={`mt-2 text-[11px] ${
+                    otaUploadState === 'success'
+                      ? 'text-emerald-300/90'
+                      : otaUploadState === 'error'
+                        ? 'text-red-300/90'
+                        : 'text-gray-400'
+                  }`}
+                >
+                  {otaUploadMessage}
+                </div>
+              )}
+            </SettingGroup>
           </div>
         </div>
       )}
