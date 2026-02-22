@@ -131,6 +131,8 @@ private:
     void update_temperature_info_graph();
     void ensure_temperature_graph_overlays();
     void update_temperature_graph_overlays(bool has_values, float min_temp, float max_temp, float latest_temp);
+    void ensure_temperature_zone_overlay();
+    void update_temperature_zone_overlay(float y_min_display, float y_max_display);
     void ensure_temperature_time_labels();
     void update_temperature_time_labels();
     uint16_t temperature_graph_points() const;
@@ -558,5 +560,7 @@ private:
     lv_obj_t *temp_graph_label_min_ = nullptr;
     lv_obj_t *temp_graph_label_now_ = nullptr;
     lv_obj_t *temp_graph_label_max_ = nullptr;
+    lv_obj_t *temp_graph_zone_overlay_ = nullptr;
+    lv_obj_t *temp_graph_zone_bands_[7] = {};
     lv_obj_t *temp_graph_time_labels_[7] = {};
 };

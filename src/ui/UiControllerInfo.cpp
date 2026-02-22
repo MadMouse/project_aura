@@ -92,6 +92,7 @@ void format_relative_time_label(uint32_t offset_s, char *buf, size_t buf_size) {
 }
 
 constexpr uint8_t kTempGraphTimeTickCount = 7;
+constexpr uint8_t kTempGraphThresholdZoneCount = 7;
 
 } // namespace
 
@@ -170,7 +171,10 @@ void UiController::apply_temperature_graph_theme() {
 
     lv_chart_set_type(objects.chart_temp_info, LV_CHART_TYPE_LINE);
     lv_chart_set_update_mode(objects.chart_temp_info, LV_CHART_UPDATE_MODE_SHIFT);
-    lv_chart_set_div_line_count(objects.chart_temp_info, 5, 12);
+    // Vertical grid density is fixed for time axis readability; horizontal is adjusted in graph update.
+    constexpr uint8_t kGraphHorizontalDivisions = 5;
+    constexpr uint8_t kGraphVerticalDivisions = 15;
+    lv_chart_set_div_line_count(objects.chart_temp_info, kGraphHorizontalDivisions, kGraphVerticalDivisions);
 
     lv_obj_set_style_bg_color(objects.chart_temp_info, card_bg, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(objects.chart_temp_info, LV_OPA_30, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -253,6 +257,135 @@ void UiController::update_temperature_graph_overlays(bool has_values, float min_
     safe_label_set_text(temp_graph_label_min_, min_buf);
     safe_label_set_text(temp_graph_label_now_, now_buf);
     safe_label_set_text(temp_graph_label_max_, max_buf);
+}
+
+void UiController::ensure_temperature_zone_overlay() {
+    if (!objects.temperature_info_graph || !objects.chart_temp_info) {
+        return;
+    }
+
+    if (!temp_graph_zone_overlay_ || !lv_obj_is_valid(temp_graph_zone_overlay_) ||
+        lv_obj_get_parent(temp_graph_zone_overlay_) != objects.temperature_info_graph) {
+        temp_graph_zone_overlay_ = lv_obj_create(objects.temperature_info_graph);
+        lv_obj_clear_flag(temp_graph_zone_overlay_, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_set_style_bg_opa(temp_graph_zone_overlay_, LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_border_width(temp_graph_zone_overlay_, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_pad_left(temp_graph_zone_overlay_, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_pad_right(temp_graph_zone_overlay_, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_pad_top(temp_graph_zone_overlay_, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_pad_bottom(temp_graph_zone_overlay_, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    }
+
+    const lv_coord_t chart_x = lv_obj_get_x(objects.chart_temp_info);
+    const lv_coord_t chart_y = lv_obj_get_y(objects.chart_temp_info);
+    const lv_coord_t chart_w = lv_obj_get_width(objects.chart_temp_info);
+    const lv_coord_t chart_h = lv_obj_get_height(objects.chart_temp_info);
+
+    lv_obj_set_pos(temp_graph_zone_overlay_, chart_x, chart_y);
+    lv_obj_set_size(temp_graph_zone_overlay_, chart_w, chart_h);
+    lv_obj_set_style_radius(temp_graph_zone_overlay_,
+                            lv_obj_get_style_radius(objects.chart_temp_info, LV_PART_MAIN),
+                            LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    for (uint8_t i = 0; i < kTempGraphThresholdZoneCount; ++i) {
+        lv_obj_t *&band = temp_graph_zone_bands_[i];
+        if (!band || !lv_obj_is_valid(band) || lv_obj_get_parent(band) != temp_graph_zone_overlay_) {
+            band = lv_obj_create(temp_graph_zone_overlay_);
+            lv_obj_clear_flag(band, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
+            lv_obj_set_style_border_width(band, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_radius(band, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_pad_left(band, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_pad_right(band, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_pad_top(band, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_pad_bottom(band, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+        }
+        lv_obj_move_background(band);
+    }
+
+    lv_obj_move_background(temp_graph_zone_overlay_);
+    lv_obj_move_foreground(objects.chart_temp_info);
+}
+
+void UiController::update_temperature_zone_overlay(float y_min_display, float y_max_display) {
+    ensure_temperature_zone_overlay();
+    if (!temp_graph_zone_overlay_ || !lv_obj_is_valid(temp_graph_zone_overlay_)) {
+        return;
+    }
+
+    const lv_coord_t width = lv_obj_get_width(temp_graph_zone_overlay_);
+    const lv_coord_t height = lv_obj_get_height(temp_graph_zone_overlay_);
+    if (width <= 0 || height <= 0 || !isfinite(y_min_display) || !isfinite(y_max_display) || y_max_display <= y_min_display) {
+        for (uint8_t i = 0; i < kTempGraphThresholdZoneCount; ++i) {
+            if (temp_graph_zone_bands_[i]) {
+                lv_obj_add_flag(temp_graph_zone_bands_[i], LV_OBJ_FLAG_HIDDEN);
+            }
+        }
+        return;
+    }
+
+    const lv_color_t chart_bg = lv_obj_get_style_bg_color(objects.chart_temp_info, LV_PART_MAIN);
+    const lv_color_t base_colors[kTempGraphThresholdZoneCount] = {
+        color_red(),    // below 16C
+        color_orange(), // 16..18
+        color_yellow(), // 18..20
+        color_green(),  // 20..25
+        color_yellow(), // 25..26
+        color_orange(), // 26..28
+        color_red()     // above 28C
+    };
+
+    const float thresholds_c[6] = {16.0f, 18.0f, 20.0f, 25.0f, 26.0f, 28.0f};
+    float bounds[kTempGraphThresholdZoneCount + 1];
+    bounds[0] = -1000.0f;
+    for (uint8_t i = 0; i < 6; ++i) {
+        bounds[i + 1] = temperature_to_display(thresholds_c[i], temp_units_c);
+    }
+    bounds[kTempGraphThresholdZoneCount] = 1000.0f;
+
+    const float denom = y_max_display - y_min_display;
+    for (uint8_t i = 0; i < kTempGraphThresholdZoneCount; ++i) {
+        lv_obj_t *band = temp_graph_zone_bands_[i];
+        if (!band) {
+            continue;
+        }
+
+        const float zone_low = bounds[i];
+        const float zone_high = bounds[i + 1];
+        const float visible_low = fmaxf(zone_low, y_min_display);
+        const float visible_high = fminf(zone_high, y_max_display);
+        if (!(visible_high > visible_low)) {
+            lv_obj_add_flag(band, LV_OBJ_FLAG_HIDDEN);
+            continue;
+        }
+
+        float top_ratio = (y_max_display - visible_high) / denom;
+        float bottom_ratio = (y_max_display - visible_low) / denom;
+        if (top_ratio < 0.0f) top_ratio = 0.0f;
+        if (top_ratio > 1.0f) top_ratio = 1.0f;
+        if (bottom_ratio < 0.0f) bottom_ratio = 0.0f;
+        if (bottom_ratio > 1.0f) bottom_ratio = 1.0f;
+
+        lv_coord_t top = static_cast<lv_coord_t>(lroundf(top_ratio * static_cast<float>(height)));
+        lv_coord_t bottom = static_cast<lv_coord_t>(lroundf(bottom_ratio * static_cast<float>(height)));
+        if (bottom <= top) {
+            bottom = static_cast<lv_coord_t>(top + 1);
+        }
+        if (top < 0) top = 0;
+        if (bottom > height) bottom = height;
+        if (bottom <= top) {
+            lv_obj_add_flag(band, LV_OBJ_FLAG_HIDDEN);
+            continue;
+        }
+
+        lv_obj_set_pos(band, 0, top);
+        lv_obj_set_size(band, width, static_cast<lv_coord_t>(bottom - top));
+        lv_color_t zone_color = lv_color_mix(base_colors[i], chart_bg, LV_OPA_40);
+        lv_obj_set_style_bg_color(band, zone_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_bg_opa(band, LV_OPA_30, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_clear_flag(band, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_move_background(band);
+    }
+
 }
 
 void UiController::ensure_temperature_time_labels() {
@@ -438,21 +571,21 @@ void UiController::update_temperature_info_graph() {
         lv_chart_set_value_by_id(objects.chart_temp_info, series, i, point_value);
     }
 
-    if (!has_values) {
-        const float fallback = temp_units_c ? 22.0f : 71.6f;
-        const lv_coord_t center = static_cast<lv_coord_t>(lroundf(fallback * 10.0f));
-        lv_chart_set_range(objects.chart_temp_info,
-                           LV_CHART_AXIS_PRIMARY_Y,
-                           static_cast<lv_coord_t>(center - 100),
-                           static_cast<lv_coord_t>(center + 100));
-        update_temperature_graph_overlays(false, fallback, fallback, fallback);
-        update_temperature_time_labels();
-        lv_chart_refresh(objects.chart_temp_info);
-        return;
+    const float fallback = temp_units_c ? 22.0f : 71.6f;
+
+    float scale_min = min_temp;
+    float scale_max = max_temp;
+    if (has_values) {
+        scale_min = min_temp;
+        scale_max = max_temp;
+    } else {
+        scale_min = fallback;
+        scale_max = fallback;
+        latest_temp = fallback;
     }
 
     const float min_span = temp_units_c ? 2.0f : 3.5f;
-    const float span = max_temp - min_temp;
+    const float span = scale_max - scale_min;
     float scale_span = span;
     if (!isfinite(scale_span) || scale_span < min_span) {
         scale_span = min_span;
@@ -461,14 +594,14 @@ void UiController::update_temperature_info_graph() {
     if (!isfinite(step) || step <= 0.0f) {
         step = temp_units_c ? 0.5f : 1.0f;
     }
-    float y_min_f = floorf((min_temp - (step * 0.9f)) / step) * step;
-    float y_max_f = ceilf((max_temp + (step * 0.9f)) / step) * step;
+    float y_min_f = floorf((scale_min - (step * 0.9f)) / step) * step;
+    float y_max_f = ceilf((scale_max + (step * 0.9f)) / step) * step;
     if ((y_max_f - y_min_f) < (step * 2.0f)) {
         y_min_f -= step;
         y_max_f += step;
     }
     if (!isfinite(y_min_f) || !isfinite(y_max_f) || y_max_f <= y_min_f) {
-        const float center = isfinite(latest_temp) ? latest_temp : (temp_units_c ? 22.0f : 71.6f);
+        const float center = isfinite(latest_temp) ? latest_temp : fallback;
         y_min_f = center - min_span;
         y_max_f = center + min_span;
     }
@@ -483,12 +616,28 @@ void UiController::update_temperature_info_graph() {
         y_min = static_cast<lv_coord_t>(center - 5);
         y_max = static_cast<lv_coord_t>(center + 5);
     }
-    lv_chart_set_range(objects.chart_temp_info, LV_CHART_AXIS_PRIMARY_Y, y_min, y_max);
-
-    if (!isfinite(latest_temp)) {
-        latest_temp = max_temp;
+    int32_t horizontal_divisions = static_cast<int32_t>(lroundf((y_max_f - y_min_f) / step));
+    if (horizontal_divisions < 3) {
+        horizontal_divisions = 3;
     }
-    update_temperature_graph_overlays(true, min_temp, max_temp, latest_temp);
+    if (horizontal_divisions > 12) {
+        horizontal_divisions = 12;
+    }
+    constexpr uint8_t kVerticalDivisions = 15;
+    lv_chart_set_div_line_count(objects.chart_temp_info,
+                                static_cast<uint8_t>(horizontal_divisions),
+                                kVerticalDivisions);
+    lv_chart_set_range(objects.chart_temp_info, LV_CHART_AXIS_PRIMARY_Y, y_min, y_max);
+    update_temperature_zone_overlay(y_min_f, y_max_f);
+
+    if (has_values) {
+        if (!isfinite(latest_temp)) {
+            latest_temp = max_temp;
+        }
+        update_temperature_graph_overlays(true, min_temp, max_temp, latest_temp);
+    } else {
+        update_temperature_graph_overlays(false, fallback, fallback, fallback);
+    }
     update_temperature_time_labels();
 
     lv_chart_refresh(objects.chart_temp_info);
