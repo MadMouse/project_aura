@@ -17,6 +17,7 @@
 
 #include "modules/StorageManager.h"
 #include "modules/PressureHistory.h"
+#include "modules/ChartsHistory.h"
 #include "modules/NetworkManager.h"
 #include "modules/MqttManager.h"
 #include "modules/SensorManager.h"
@@ -37,6 +38,7 @@ using namespace Config;
 SensorData currentData;
 StorageManager storage;
 PressureHistory pressureHistory;
+ChartsHistory chartsHistory;
 AuraNetworkManager networkManager;
 MqttManager mqttManager;
 SensorManager sensorManager;
@@ -87,6 +89,7 @@ void setup()
     delay(3000);
     Serial.begin(115200);
     Logger::begin(Serial, static_cast<Logger::Level>(Config::LOG_LEVEL));
+    Logger::setSerialOutputEnabled(Config::LOG_SERIAL_OUTPUT);
 
     // Log IPC task stack size to verify CONFIG_IPC_TASK_STACK_SIZE is applied
     #ifdef CONFIG_ESP_IPC_TASK_STACK_SIZE
@@ -114,6 +117,7 @@ void setup()
         nightModeManager,
         fanControl,
         pressureHistory,
+        chartsHistory,
         uiController,
         currentData,
         night_mode,
@@ -138,6 +142,7 @@ void loop()
     SensorManager::PollResult sensor_poll =
         sensorManager.poll(currentData, storage, pressureHistory, co2_asc_enabled);
     uiController.onSensorPoll(sensor_poll);
+    chartsHistory.update(currentData, storage);
     networkManager.poll();
     uint32_t now = millis();
     BootPolicy::markStable(now,

@@ -60,6 +60,19 @@ public:
     void mqtt_sync_with_wifi();
     void poll(uint32_t now_ms);
 
+    bool webNightModeEnabled() const { return night_mode; }
+    bool webNightModeLocked() const;
+    bool webBacklightOn() const;
+    bool webUnitsC() const { return temp_units_c; }
+    float webTempOffset() const { return temp_offset; }
+    float webHumOffset() const { return hum_offset; }
+
+    bool webSetNightMode(bool enabled);
+    bool webSetBacklight(bool enabled);
+    bool webSetUnitsC(bool units_c);
+    bool webSetOffsets(float temp_offset_c, float hum_offset_pct);
+    void webRequestRestart();
+
 private:
     friend class UiEventBinder;
     friend class UiBootFlow;
@@ -194,6 +207,8 @@ private:
     void on_back_event(lv_event_t *e);
     void on_about_event(lv_event_t *e);
     void on_about_back_event(lv_event_t *e);
+    void on_web_page_event(lv_event_t *e);
+    void on_web_page_back_event(lv_event_t *e);
     void on_wifi_settings_event(lv_event_t *e);
     void on_wifi_back_event(lv_event_t *e);
     void on_mqtt_settings_event(lv_event_t *e);
@@ -308,6 +323,8 @@ private:
     static void on_back_event_cb(lv_event_t *e);
     static void on_about_event_cb(lv_event_t *e);
     static void on_about_back_event_cb(lv_event_t *e);
+    static void on_web_page_event_cb(lv_event_t *e);
+    static void on_web_page_back_event_cb(lv_event_t *e);
     static void on_wifi_settings_event_cb(lv_event_t *e);
     static void on_wifi_back_event_cb(lv_event_t *e);
     static void on_mqtt_settings_event_cb(lv_event_t *e);

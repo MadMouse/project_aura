@@ -288,6 +288,96 @@ void UiController::mqtt_sync_with_wifi() {
     // UI state is refreshed in UiRenderLoop under lvgl_port_lock.
 }
 
+bool UiController::webNightModeLocked() const {
+    return nightModeManager.isAutoEnabled();
+}
+
+bool UiController::webBacklightOn() const {
+    return backlightManager.isOn();
+}
+
+bool UiController::webSetNightMode(bool enabled) {
+    if (nightModeManager.isAutoEnabled()) {
+        sync_night_mode_toggle_ui();
+        return false;
+    }
+    bool previous = night_mode;
+    set_night_mode_state(enabled, true);
+    sync_night_mode_toggle_ui();
+    if (night_mode != previous) {
+        data_dirty = true;
+        mqttManager.requestPublish();
+    }
+    return night_mode == enabled;
+}
+
+bool UiController::webSetBacklight(bool enabled) {
+    bool previous = backlightManager.isOn();
+    backlightManager.setOn(enabled);
+    bool changed = backlightManager.isOn() != previous;
+    if (changed) {
+        data_dirty = true;
+        mqttManager.requestPublish();
+    }
+    return backlightManager.isOn() == enabled;
+}
+
+bool UiController::webSetUnitsC(bool units_c) {
+    if (units_c == temp_units_c) {
+        return true;
+    }
+    temp_units_c = units_c;
+    storage.config().units_c = temp_units_c;
+    storage.saveConfig(true);
+    update_ui();
+    mqttManager.requestPublish();
+    return true;
+}
+
+bool UiController::webSetOffsets(float temp_offset_c, float hum_offset_pct) {
+    float temp_next = lroundf(temp_offset_c * 10.0f) / 10.0f;
+    if (temp_next < -5.0f) {
+        temp_next = -5.0f;
+    } else if (temp_next > 5.0f) {
+        temp_next = 5.0f;
+    }
+
+    float hum_next = lroundf(hum_offset_pct);
+    if (hum_next < HUM_OFFSET_MIN) {
+        hum_next = HUM_OFFSET_MIN;
+    } else if (hum_next > HUM_OFFSET_MAX) {
+        hum_next = HUM_OFFSET_MAX;
+    }
+
+    bool changed = (temp_next != temp_offset) || (hum_next != hum_offset);
+    temp_offset = temp_next;
+    hum_offset = hum_next;
+    sensorManager.setOffsets(temp_offset, hum_offset);
+    temp_offset_ui_dirty = true;
+    hum_offset_ui_dirty = true;
+
+    if (!changed) {
+        return true;
+    }
+
+    temp_offset_saved = temp_offset;
+    hum_offset_saved = hum_offset;
+    temp_offset_dirty = false;
+    hum_offset_dirty = false;
+    storage.config().temp_offset = temp_offset;
+    storage.config().hum_offset = hum_offset;
+    storage.saveConfig(true);
+    data_dirty = true;
+    mqttManager.requestPublish();
+    return true;
+}
+
+void UiController::webRequestRestart() {
+    LOGW("UI", "web restart requested");
+    delay(100);
+    ESP.restart();
+}
+
 void UiController::poll(uint32_t now) {
     backlightManager.setAlarmWakeActive(
         should_wake_backlight_on_alert(currentData, sensorManager.isWarmupActive()));
@@ -1022,6 +1112,11 @@ void UiController::update_temp_offset_label() {
         return;
     }
     float val = temp_offset;
+    if (!temp_units_c) {
+        // Offset is stored in C; show equivalent offset in F when F units are active.
+        val = val * 9.0f / 5.0f;
+    }
+    val = lroundf(val * 10.0f) / 10.0f;
     if (fabsf(val) < 0.05f) {
         val = 0.0f;
     }
@@ -1272,6 +1367,7 @@ void UiController::init_ui_defaults() {
     }
 
     set_visible(objects.container_about, false);
+    set_visible(objects.container_web_page, false);
 
     if (objects.wifi_status_icon_1) lv_obj_add_flag(objects.wifi_status_icon_1, LV_OBJ_FLAG_HIDDEN);
     if (objects.wifi_status_icon_2) lv_obj_add_flag(objects.wifi_status_icon_2, LV_OBJ_FLAG_HIDDEN);

@@ -74,6 +74,7 @@ void AuraNetworkManager::begin(StorageManager &storage) {
 
     web_ctx_.server = &server_;
     web_ctx_.storage = storage_;
+    web_ctx_.hostname = &hostname_;
     web_ctx_.wifi_ssid = &wifi_ssid_;
     web_ctx_.wifi_pass = &wifi_pass_;
     web_ctx_.wifi_enabled = &wifi_enabled_;
@@ -154,6 +155,10 @@ void AuraNetworkManager::attachThemeContext(ThemeManager &themeManager) {
     web_ctx_.theme_manager = &themeManager;
 }
 
+void AuraNetworkManager::attachChartsContext(ChartsHistory &chartsHistory) {
+    web_ctx_.charts_history = &chartsHistory;
+}
+
 void AuraNetworkManager::attachDacContext(FanControl &fanControl,
                                           SensorManager &sensorManager,
                                           SensorData &sensorData) {
@@ -162,12 +167,18 @@ void AuraNetworkManager::attachDacContext(FanControl &fanControl,
     web_ctx_.sensor_data = &sensorData;
 }
 
+void AuraNetworkManager::attachUiContext(UiController &uiController) {
+    web_ctx_.ui_controller = &uiController;
+}
+
 void AuraNetworkManager::registerServerRoutes() {
     if (server_routes_registered_) {
         return;
     }
 
-    server_.on("/", HTTP_GET, wifi_handle_root);
+    server_.on("/", HTTP_GET, dashboard_handle_root);
+    server_.on("/dashboard", HTTP_GET, dashboard_handle_root);
+    server_.on("/wifi", HTTP_GET, wifi_handle_root);
     server_.on("/save", HTTP_POST, wifi_handle_save);
     server_.on("/mqtt", HTTP_GET, mqtt_handle_root);
     server_.on("/mqtt", HTTP_POST, mqtt_handle_save);
@@ -177,6 +188,10 @@ void AuraNetworkManager::registerServerRoutes() {
     server_.on("/dac/state", HTTP_GET, dac_handle_state);
     server_.on("/dac/action", HTTP_POST, dac_handle_action);
     server_.on("/dac/auto", HTTP_POST, dac_handle_auto);
+    server_.on("/api/charts", HTTP_GET, charts_handle_data);
+    server_.on("/api/state", HTTP_GET, state_handle_data);
+    server_.on("/api/events", HTTP_GET, events_handle_data);
+    server_.on("/api/settings", HTTP_POST, settings_handle_update);
     server_.onNotFound(wifi_handle_not_found);
     server_routes_registered_ = true;
 }

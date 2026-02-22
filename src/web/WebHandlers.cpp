@@ -6,6 +6,8 @@
 
 #include "web/WebHandlers.h"
 
+#include <math.h>
+#include <time.h>
 #include <WiFi.h>
 #include <WebServer.h>
 #include <PubSubClient.h>
@@ -14,12 +16,20 @@
 #include "lvgl_v8_port.h"
 #include "config/AppConfig.h"
 #include "config/AppData.h"
+#include "core/MathUtils.h"
+#include "core/Logger.h"
+#include "modules/ChartsHistory.h"
 #include "modules/DacAutoConfig.h"
 #include "modules/FanControl.h"
 #include "modules/SensorManager.h"
 #include "modules/StorageManager.h"
 #include "web/WebTemplates.h"
+#include "ui/UiController.h"
 #include "ui/ThemeManager.h"
+
+#ifndef APP_VERSION
+#define APP_VERSION "dev"
+#endif
 
 namespace {
 
@@ -29,9 +39,101 @@ bool g_deferred_wifi_start_sta = false;
 bool g_deferred_mqtt_sync = false;
 uint32_t g_deferred_wifi_start_sta_due_ms = 0;
 uint32_t g_deferred_mqtt_sync_due_ms = 0;
+constexpr uint32_t kChartStepS = Config::CHART_HISTORY_STEP_MS / 1000UL;
+constexpr size_t kEventsApiMaxEntries = 48;
+Logger::RecentEntry g_events_snapshot[kEventsApiMaxEntries];
+
+struct ChartMetricSpec {
+    const char *key;
+    const char *unit;
+    ChartsHistory::Metric metric;
+};
+
+constexpr ChartMetricSpec kChartCoreMetrics[] = {
+    {"co2", "ppm", ChartsHistory::METRIC_CO2},
+    {"temperature", "C", ChartsHistory::METRIC_TEMPERATURE},
+    {"humidity", "%", ChartsHistory::METRIC_HUMIDITY},
+    {"pressure", "hPa", ChartsHistory::METRIC_PRESSURE},
+};
+
+constexpr ChartMetricSpec kChartGasMetrics[] = {
+    {"co", "ppm", ChartsHistory::METRIC_CO},
+    {"voc", "idx", ChartsHistory::METRIC_VOC},
+    {"nox", "idx", ChartsHistory::METRIC_NOX},
+    {"hcho", "ppb", ChartsHistory::METRIC_HCHO},
+};
+
+constexpr ChartMetricSpec kChartPmMetrics[] = {
+    {"pm05", "#/cm3", ChartsHistory::METRIC_PM05},
+    {"pm1", "ug/m3", ChartsHistory::METRIC_PM1},
+    {"pm25", "ug/m3", ChartsHistory::METRIC_PM25},
+    {"pm4", "ug/m3", ChartsHistory::METRIC_PM4},
+    {"pm10", "ug/m3", ChartsHistory::METRIC_PM10},
+};
 
 WebHandlerContext *ctx() {
     return g_ctx;
+}
+
+uint16_t chart_window_points(const String &window_arg, const char *&window_name) {
+    String window = window_arg;
+    window.trim();
+    window.toLowerCase();
+
+    if (window == "1h") {
+        window_name = "1h";
+        return Config::CHART_HISTORY_1H_STEPS;
+    }
+    if (window == "24h") {
+        window_name = "24h";
+        return Config::CHART_HISTORY_24H_SAMPLES;
+    }
+    window_name = "3h";
+    return Config::CHART_HISTORY_3H_STEPS;
+}
+
+void chart_group_metrics(const String &group_arg,
+                         const char *&group_name,
+                         const ChartMetricSpec *&metrics,
+                         size_t &metric_count) {
+    String group = group_arg;
+    group.trim();
+    group.toLowerCase();
+
+    if (group == "gases" || group == "gas") {
+        group_name = "gases";
+        metrics = kChartGasMetrics;
+        metric_count = sizeof(kChartGasMetrics) / sizeof(kChartGasMetrics[0]);
+        return;
+    }
+    if (group == "pm") {
+        group_name = "pm";
+        metrics = kChartPmMetrics;
+        metric_count = sizeof(kChartPmMetrics) / sizeof(kChartPmMetrics[0]);
+        return;
+    }
+    group_name = "core";
+    metrics = kChartCoreMetrics;
+    metric_count = sizeof(kChartCoreMetrics) / sizeof(kChartCoreMetrics[0]);
+}
+
+bool chart_latest_metric(const ChartsHistory &history,
+                         ChartsHistory::Metric metric,
+                         float &out_value) {
+    uint16_t total_count = history.count();
+    if (total_count == 0) {
+        return false;
+    }
+    for (int offset = static_cast<int>(total_count) - 1; offset >= 0; --offset) {
+        float value = 0.0f;
+        bool valid = false;
+        if (history.metricValueFromOldest(static_cast<uint16_t>(offset), metric, value, valid) &&
+            valid && isfinite(value)) {
+            out_value = value;
+            return true;
+        }
+    }
+    return false;
 }
 
 bool deadline_reached(uint32_t now_ms, uint32_t due_ms) {
@@ -116,6 +218,93 @@ const char *dac_status_text(const FanControl &fan) {
         return "OFFLINE";
     }
     return fan.isRunning() ? "RUNNING" : "STOPPED";
+}
+
+const char *event_level_text(Logger::Level level) {
+    switch (level) {
+        case Logger::Error: return "E";
+        case Logger::Warn: return "W";
+        case Logger::Info: return "I";
+        case Logger::Debug: return "D";
+        default: return "?";
+    }
+}
+
+const char *event_severity_text(Logger::Level level) {
+    switch (level) {
+        case Logger::Error: return "critical";
+        case Logger::Warn: return "warning";
+        case Logger::Info: return "info";
+        case Logger::Debug: return "info";
+        default: return "info";
+    }
+}
+
+void json_set_float_or_null(ArduinoJson::JsonObject obj, const char *key, bool valid, float value) {
+    if (valid && isfinite(value)) {
+        obj[key] = value;
+    } else {
+        obj[key] = nullptr;
+    }
+}
+
+void json_set_int_or_null(ArduinoJson::JsonObject obj, const char *key, bool valid, int value) {
+    if (valid) {
+        obj[key] = value;
+    } else {
+        obj[key] = nullptr;
+    }
+}
+
+String format_uptime_human(uint32_t uptime_seconds) {
+    uint32_t days = uptime_seconds / 86400UL;
+    uptime_seconds %= 86400UL;
+    uint32_t hours = uptime_seconds / 3600UL;
+    uptime_seconds %= 3600UL;
+    uint32_t minutes = uptime_seconds / 60UL;
+
+    char buf[32];
+    if (days > 0) {
+        snprintf(buf, sizeof(buf), "%lud %luh %lum",
+                 static_cast<unsigned long>(days),
+                 static_cast<unsigned long>(hours),
+                 static_cast<unsigned long>(minutes));
+    } else {
+        snprintf(buf, sizeof(buf), "%luh %lum",
+                 static_cast<unsigned long>(hours),
+                 static_cast<unsigned long>(minutes));
+    }
+    return String(buf);
+}
+
+void fill_web_settings_json(ArduinoJson::JsonObject settings, const WebHandlerContext &context) {
+    if (context.ui_controller) {
+        settings["night_mode"] = context.ui_controller->webNightModeEnabled();
+        settings["night_mode_locked"] = context.ui_controller->webNightModeLocked();
+        settings["backlight_on"] = context.ui_controller->webBacklightOn();
+        settings["units_c"] = context.ui_controller->webUnitsC();
+        settings["temp_offset"] = context.ui_controller->webTempOffset();
+        settings["hum_offset"] = context.ui_controller->webHumOffset();
+        return;
+    }
+
+    if (context.storage) {
+        const auto &cfg = context.storage->config();
+        settings["night_mode"] = cfg.night_mode;
+        settings["night_mode_locked"] = cfg.auto_night_enabled;
+        settings["backlight_on"] = nullptr;
+        settings["units_c"] = cfg.units_c;
+        settings["temp_offset"] = cfg.temp_offset;
+        settings["hum_offset"] = cfg.hum_offset;
+        return;
+    }
+
+    settings["night_mode"] = nullptr;
+    settings["night_mode_locked"] = nullptr;
+    settings["backlight_on"] = nullptr;
+    settings["units_c"] = nullptr;
+    settings["temp_offset"] = nullptr;
+    settings["hum_offset"] = nullptr;
 }
 
 } // namespace
@@ -245,6 +434,29 @@ void wifi_handle_root() {
     html.replace("{{SCAN_IN_PROGRESS}}",
                  (context->wifi_scan_in_progress && *context->wifi_scan_in_progress) ? "1" : "0");
     server.send(200, "text/html", html);
+}
+
+void dashboard_handle_root() {
+    WebHandlerContext *context = ctx();
+    if (!context || !context->server) {
+        return;
+    }
+
+    const bool ap_mode = context->wifi_is_ap_mode && context->wifi_is_ap_mode();
+    const String uri = context->server->uri();
+
+    // Keep captive-portal setup flow intact on AP root.
+    if (ap_mode && uri == "/") {
+        wifi_handle_root();
+        return;
+    }
+
+    if (!ap_mode && context->wifi_is_connected && !context->wifi_is_connected()) {
+        context->server->send(404, "text/plain", "Not found");
+        return;
+    }
+
+    context->server->send_P(200, "text/html", WebTemplates::kDashboardPageTemplate);
 }
 
 void wifi_handle_save() {
@@ -750,4 +962,343 @@ void dac_handle_auto() {
         }
     }
     server.send(200, "application/json", "{\"success\":true}");
+}
+
+void charts_handle_data() {
+    WebHandlerContext *context = ctx();
+    if (!context || !context->server || !context->charts_history) {
+        return;
+    }
+
+    WebServer &server = *context->server;
+    const ChartsHistory &history = *context->charts_history;
+
+    const char *window_name = "3h";
+    uint16_t window_points = chart_window_points(server.arg("window"), window_name);
+
+    const char *group_name = "core";
+    const ChartMetricSpec *metrics = nullptr;
+    size_t metric_count = 0;
+    chart_group_metrics(server.arg("group"), group_name, metrics, metric_count);
+
+    uint16_t total_count = history.count();
+    uint16_t available = (total_count < window_points) ? total_count : window_points;
+    uint16_t missing_prefix = window_points - available;
+    uint16_t start_offset = total_count - available;
+
+    uint32_t latest_epoch = history.latestEpoch();
+    bool has_epoch = latest_epoch > Config::TIME_VALID_EPOCH;
+
+    ArduinoJson::JsonDocument doc;
+    doc["success"] = true;
+    doc["group"] = group_name;
+    doc["window"] = window_name;
+    doc["step_s"] = kChartStepS;
+    doc["points"] = window_points;
+    doc["available"] = available;
+
+    ArduinoJson::JsonArray timestamps = doc["timestamps"].to<ArduinoJson::JsonArray>();
+    for (uint16_t i = 0; i < window_points; ++i) {
+        if (!has_epoch) {
+            timestamps.add(nullptr);
+            continue;
+        }
+        uint32_t back_steps = static_cast<uint32_t>(window_points - 1 - i);
+        timestamps.add(latest_epoch - back_steps * kChartStepS);
+    }
+
+    ArduinoJson::JsonArray series = doc["series"].to<ArduinoJson::JsonArray>();
+    for (size_t i = 0; i < metric_count; ++i) {
+        const ChartMetricSpec &spec = metrics[i];
+        ArduinoJson::JsonObject entry = series.add<ArduinoJson::JsonObject>();
+        entry["key"] = spec.key;
+        entry["unit"] = spec.unit;
+
+        float latest_value = 0.0f;
+        if (chart_latest_metric(history, spec.metric, latest_value)) {
+            entry["latest"] = latest_value;
+        } else {
+            entry["latest"] = nullptr;
+        }
+
+        ArduinoJson::JsonArray values = entry["values"].to<ArduinoJson::JsonArray>();
+        for (uint16_t slot = 0; slot < window_points; ++slot) {
+            if (slot < missing_prefix) {
+                values.add(nullptr);
+                continue;
+            }
+
+            uint16_t offset = start_offset + (slot - missing_prefix);
+            float value = 0.0f;
+            bool valid = false;
+            if (!history.metricValueFromOldest(offset, spec.metric, value, valid) ||
+                !valid || !isfinite(value)) {
+                values.add(nullptr);
+                continue;
+            }
+            values.add(value);
+        }
+    }
+
+    String json;
+    serializeJson(doc, json);
+    server.send(200, "application/json", json);
+}
+
+void state_handle_data() {
+    WebHandlerContext *context = ctx();
+    if (!context || !context->server || !context->sensor_data) {
+        return;
+    }
+
+    const SensorData &data = *context->sensor_data;
+    WebServer &server = *context->server;
+    const uint32_t uptime_s = millis() / 1000UL;
+    const time_t now_epoch = time(nullptr);
+
+    ArduinoJson::JsonDocument doc;
+    doc["success"] = true;
+    doc["uptime_s"] = uptime_s;
+    doc["timestamp_ms"] = millis();
+    if (now_epoch > 0) {
+        doc["time_epoch_s"] = static_cast<int64_t>(now_epoch);
+    } else {
+        doc["time_epoch_s"] = nullptr;
+    }
+
+    ArduinoJson::JsonObject sensors = doc["sensors"].to<ArduinoJson::JsonObject>();
+    json_set_float_or_null(sensors, "temp", data.temp_valid, data.temperature);
+    json_set_float_or_null(sensors, "rh", data.hum_valid, data.humidity);
+    json_set_float_or_null(sensors, "pressure", data.pressure_valid, data.pressure);
+    json_set_float_or_null(sensors, "pm05", data.pm05_valid, data.pm05);
+    json_set_float_or_null(sensors, "pm1", data.pm1_valid, data.pm1);
+    json_set_float_or_null(sensors, "pm25", data.pm25_valid, data.pm25);
+    json_set_float_or_null(sensors, "pm4", data.pm4_valid, data.pm4);
+    json_set_float_or_null(sensors, "pm10", data.pm10_valid, data.pm10);
+    json_set_int_or_null(sensors, "co2", data.co2_valid, data.co2);
+    json_set_int_or_null(sensors, "voc", data.voc_valid, data.voc_index);
+    json_set_int_or_null(sensors, "nox", data.nox_valid, data.nox_index);
+    json_set_float_or_null(sensors, "hcho", data.hcho_valid, data.hcho);
+    json_set_float_or_null(sensors, "co", data.co_valid && data.co_sensor_present, data.co_ppm);
+    sensors["co_sensor_present"] = data.co_sensor_present;
+    sensors["co_warmup"] = data.co_warmup;
+
+    ArduinoJson::JsonObject derived = doc["derived"].to<ArduinoJson::JsonObject>();
+    const bool climate_valid = data.temp_valid && data.hum_valid;
+    const float dew_point = climate_valid ? MathUtils::compute_dew_point_c(data.temperature, data.humidity) : NAN;
+    const float abs_humidity = climate_valid ? MathUtils::compute_absolute_humidity_gm3(data.temperature, data.humidity) : NAN;
+    const int mold_risk = climate_valid ? MathUtils::compute_mold_risk_index(data.temperature, data.humidity) : -1;
+    json_set_float_or_null(derived, "dew_point", climate_valid, dew_point);
+    json_set_float_or_null(derived, "ah", climate_valid, abs_humidity);
+    if (mold_risk >= 0) {
+        derived["mold"] = mold_risk;
+    } else {
+        derived["mold"] = nullptr;
+    }
+    json_set_float_or_null(derived, "pressure_delta_3h", data.pressure_delta_3h_valid, data.pressure_delta_3h);
+    json_set_float_or_null(derived, "pressure_delta_24h", data.pressure_delta_24h_valid, data.pressure_delta_24h);
+    derived["uptime"] = format_uptime_human(uptime_s);
+
+    ArduinoJson::JsonObject network = doc["network"].to<ArduinoJson::JsonObject>();
+    const bool wifi_enabled = context->wifi_enabled ? *context->wifi_enabled : false;
+    const bool ap_mode = context->wifi_is_ap_mode && context->wifi_is_ap_mode();
+    const bool sta_connected = context->wifi_is_connected && context->wifi_is_connected();
+    network["wifi_enabled"] = wifi_enabled;
+    network["mode"] = ap_mode ? "ap" : (sta_connected ? "sta" : "off");
+
+    String wifi_ssid;
+    if (ap_mode) {
+        wifi_ssid = WiFi.softAPSSID();
+    } else if (sta_connected) {
+        wifi_ssid = WiFi.SSID();
+    } else if (context->wifi_ssid) {
+        wifi_ssid = *context->wifi_ssid;
+    }
+    network["wifi_ssid"] = wifi_ssid;
+
+    String ip = ap_mode ? WiFi.softAPIP().toString() : WiFi.localIP().toString();
+    network["ip"] = ip;
+
+    const int rssi = sta_connected ? WiFi.RSSI() : 0;
+    if (sta_connected && rssi < 0) {
+        network["rssi"] = rssi;
+    } else {
+        network["rssi"] = nullptr;
+    }
+
+    if (context->hostname) {
+        network["hostname"] = *context->hostname;
+    } else {
+        network["hostname"] = "aura";
+    }
+
+    if (context->mqtt_host) {
+        network["mqtt_broker"] = *context->mqtt_host;
+    } else {
+        network["mqtt_broker"] = "";
+    }
+    if (context->mqtt_user_enabled) {
+        network["mqtt_enabled"] = *context->mqtt_user_enabled;
+    } else {
+        network["mqtt_enabled"] = false;
+    }
+    network["mqtt_connected"] = context->mqtt_client && context->mqtt_client->connected();
+
+    ArduinoJson::JsonObject system = doc["system"].to<ArduinoJson::JsonObject>();
+    system["firmware"] = APP_VERSION;
+    system["build_date"] = __DATE__;
+    system["build_time"] = __TIME__;
+    system["uptime"] = format_uptime_human(uptime_s);
+    system["dac_available"] = context->fan_control && context->fan_control->isAvailable();
+
+    ArduinoJson::JsonObject settings = doc["settings"].to<ArduinoJson::JsonObject>();
+    fill_web_settings_json(settings, *context);
+
+    String json;
+    serializeJson(doc, json);
+    server.send(200, "application/json", json);
+}
+
+void settings_handle_update() {
+    WebHandlerContext *context = ctx();
+    if (!context || !context->server) {
+        return;
+    }
+
+    WebServer &server = *context->server;
+    if (!context->ui_controller) {
+        server.send(503, "text/plain", "UI controller unavailable");
+        return;
+    }
+    String body = server.arg("plain");
+    if (body.isEmpty()) {
+        server.send(400, "text/plain", "Missing body");
+        return;
+    }
+
+    ArduinoJson::JsonDocument doc;
+    ArduinoJson::DeserializationError err = ArduinoJson::deserializeJson(doc, body);
+    if (err) {
+        server.send(400, "text/plain", "Invalid JSON");
+        return;
+    }
+
+    UiController &ui = *context->ui_controller;
+
+    ArduinoJson::JsonVariantConst night_mode_var = doc["night_mode"];
+    if (!night_mode_var.isNull()) {
+        if (!night_mode_var.is<bool>()) {
+            server.send(400, "text/plain", "night_mode must be bool");
+            return;
+        }
+        if (!ui.webSetNightMode(night_mode_var.as<bool>())) {
+            server.send(409, "text/plain", "night_mode is locked by auto mode");
+            return;
+        }
+    }
+
+    ArduinoJson::JsonVariantConst backlight_var = doc["backlight_on"];
+    if (!backlight_var.isNull()) {
+        if (!backlight_var.is<bool>()) {
+            server.send(400, "text/plain", "backlight_on must be bool");
+            return;
+        }
+        ui.webSetBacklight(backlight_var.as<bool>());
+    }
+
+    ArduinoJson::JsonVariantConst units_c_var = doc["units_c"];
+    if (!units_c_var.isNull()) {
+        if (!units_c_var.is<bool>()) {
+            server.send(400, "text/plain", "units_c must be bool");
+            return;
+        }
+        ui.webSetUnitsC(units_c_var.as<bool>());
+    }
+
+    const ArduinoJson::JsonVariantConst temp_offset_var = doc["temp_offset"];
+    const ArduinoJson::JsonVariantConst hum_offset_var = doc["hum_offset"];
+    const bool has_temp_offset = !temp_offset_var.isNull();
+    const bool has_hum_offset = !hum_offset_var.isNull();
+    if (has_temp_offset || has_hum_offset) {
+        float temp_offset = ui.webTempOffset();
+        float hum_offset = ui.webHumOffset();
+
+        if (has_temp_offset) {
+            if (!temp_offset_var.is<float>() && !temp_offset_var.is<int>()) {
+                server.send(400, "text/plain", "temp_offset must be number");
+                return;
+            }
+            temp_offset = temp_offset_var.as<float>();
+        }
+        if (has_hum_offset) {
+            if (!hum_offset_var.is<float>() && !hum_offset_var.is<int>()) {
+                server.send(400, "text/plain", "hum_offset must be number");
+                return;
+            }
+            hum_offset = hum_offset_var.as<float>();
+        }
+
+        ui.webSetOffsets(temp_offset, hum_offset);
+    }
+
+    bool restart_requested = false;
+    ArduinoJson::JsonVariantConst restart_var = doc["restart"];
+    if (!restart_var.isNull()) {
+        if (!restart_var.is<bool>()) {
+            server.send(400, "text/plain", "restart must be bool");
+            return;
+        }
+        restart_requested = restart_var.as<bool>();
+    }
+
+    ArduinoJson::JsonDocument response_doc;
+    response_doc["success"] = true;
+    response_doc["restart"] = restart_requested;
+    ArduinoJson::JsonObject response_settings = response_doc["settings"].to<ArduinoJson::JsonObject>();
+    fill_web_settings_json(response_settings, *context);
+
+    String json;
+    serializeJson(response_doc, json);
+    server.send(200, "application/json", json);
+
+    if (restart_requested) {
+        ui.webRequestRestart();
+    }
+}
+
+void events_handle_data() {
+    WebHandlerContext *context = ctx();
+    if (!context || !context->server) {
+        return;
+    }
+
+    WebServer &server = *context->server;
+    const size_t count = Logger::copyRecent(g_events_snapshot, kEventsApiMaxEntries);
+
+    ArduinoJson::JsonDocument doc;
+    doc["success"] = true;
+    uint32_t emitted_count = 0;
+    doc["count"] = static_cast<uint32_t>(count);
+    doc["uptime_s"] = millis() / 1000UL;
+
+    ArduinoJson::JsonArray events = doc["events"].to<ArduinoJson::JsonArray>();
+    for (size_t i = 0; i < count; ++i) {
+        const Logger::RecentEntry &entry = g_events_snapshot[i];
+        // Keep memory telemetry in serial monitor, but hide it from web Events feed.
+        if (strcmp(entry.tag, "Mem") == 0) {
+            continue;
+        }
+        ArduinoJson::JsonObject e = events.add<ArduinoJson::JsonObject>();
+        e["ts_ms"] = entry.ms;
+        e["level"] = event_level_text(entry.level);
+        e["severity"] = event_severity_text(entry.level);
+        e["type"] = entry.tag[0] ? entry.tag : "SYSTEM";
+        e["message"] = entry.message[0] ? entry.message : "Event";
+        emitted_count++;
+    }
+    doc["count"] = emitted_count;
+
+    String json;
+    serializeJson(doc, json);
+    server.send(200, "application/json", json);
 }

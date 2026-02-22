@@ -14,12 +14,15 @@ class StorageManager;
 class ThemeManager;
 class FanControl;
 class SensorManager;
+class ChartsHistory;
+class UiController;
 struct SensorData;
 
 struct WebHandlerContext {
     WebServer *server = nullptr;
     StorageManager *storage = nullptr;
     ThemeManager *theme_manager = nullptr;
+    const String *hostname = nullptr;
 
     String *wifi_ssid = nullptr;
     String *wifi_pass = nullptr;
@@ -51,7 +54,9 @@ struct WebHandlerContext {
 
     FanControl *fan_control = nullptr;
     SensorManager *sensor_manager = nullptr;
+    ChartsHistory *charts_history = nullptr;
     SensorData *sensor_data = nullptr;
+    UiController *ui_controller = nullptr;
 };
 
 void WebHandlersInit(WebHandlerContext *context);
@@ -62,6 +67,7 @@ String wifi_label_safe(const String &value);
 void wifi_build_scan_items(int count);
 
 void wifi_handle_root();
+void dashboard_handle_root();
 void wifi_handle_save();
 void wifi_handle_not_found();
 void mqtt_handle_root();
@@ -72,3 +78,7 @@ void dac_handle_root();
 void dac_handle_state();
 void dac_handle_action();
 void dac_handle_auto();
+void charts_handle_data();
+void state_handle_data();
+void events_handle_data();
+void settings_handle_update();

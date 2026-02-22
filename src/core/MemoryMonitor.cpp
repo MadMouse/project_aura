@@ -41,10 +41,8 @@ void MemoryMonitor::logNow(const char *reason) {
     const char *tag = "Mem";
     const char *reason_text = (reason && reason[0] != '\0') ? reason : "manual";
 
+    // Keep memory telemetry visible in serial logs by default.
     Logger::Level level = Logger::Info;
-    if (reason && strcmp(reason, "periodic") == 0) {
-        level = Logger::Debug;
-    }
 
     if (psram_free == 0 && psram_min == 0 && psram_max == 0) {
         Logger::log(level, tag,

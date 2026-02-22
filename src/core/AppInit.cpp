@@ -129,7 +129,9 @@ void AppInit::initManagersAndConfig(Context &ctx, StorageManager::BootAction boo
         ctx.mqttManager.anonymousRef(),
         mqtt_sync_with_wifi_cb);
     ctx.networkManager.attachThemeContext(ctx.themeManager);
+    ctx.networkManager.attachChartsContext(ctx.chartsHistory);
     ctx.networkManager.attachDacContext(ctx.fanControl, ctx.sensorManager, ctx.currentData);
+    ctx.networkManager.attachUiContext(ctx.uiController);
     g_wifi_state_ctx.network = &ctx.networkManager;
     g_wifi_state_ctx.time_manager = &ctx.timeManager;
     g_wifi_state_ctx.ui_controller = &ctx.uiController;
@@ -164,6 +166,7 @@ esp_panel::board::Board *AppInit::initBoardAndPeripherals(Context &ctx) {
     ctx.backlightManager.attachBacklight(board->getBacklight());
     ctx.timeManager.initRtc();
     ctx.pressureHistory.load(ctx.storage, ctx.currentData);
+    ctx.chartsHistory.load(ctx.storage);
     ctx.uiController.apply_auto_night_now();
 
     BootHelpers::logGt911Address();
