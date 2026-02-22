@@ -372,6 +372,62 @@ bool UiController::webSetOffsets(float temp_offset_c, float hum_offset_pct) {
     return true;
 }
 
+void UiController::apply_pending_screen_now_from_web() {
+    if (!lvgl_ready || pending_screen_id == 0) {
+        return;
+    }
+    if (!lvgl_port_lock(UI_LVGL_LOCK_TIMEOUT_MS)) {
+        LOGW("UI", "LVGL lock timeout while switching web-requested screen (pending=%d)",
+             pending_screen_id);
+        return;
+    }
+    const uint32_t now = millis();
+    UiScreenFlow::processPendingScreen(*this, now);
+    UiScreenFlow::processDeferredUnloads(*this, now);
+    lvgl_port_unlock();
+}
+
+void UiController::webSetFirmwareUpdateScreen(bool active) {
+    auto is_restore_target = [](int screen_id) {
+        return screen_id >= SCREEN_ID_PAGE_MAIN_PRO &&
+               screen_id <= SCREEN_ID_PAGE_DAC_SETTINGS;
+    };
+
+    if (active) {
+        int restore_screen = current_screen_id;
+        if (pending_screen_id > 0 && pending_screen_id != SCREEN_ID_PAGE_FW_UPDATE) {
+            restore_screen = pending_screen_id;
+        }
+        if (!is_restore_target(restore_screen)) {
+            restore_screen = SCREEN_ID_PAGE_SETTINGS;
+        }
+        firmware_update_return_screen_id_ = restore_screen;
+        firmware_update_screen_active_ = true;
+        if (current_screen_id != SCREEN_ID_PAGE_FW_UPDATE) {
+            pending_screen_id = SCREEN_ID_PAGE_FW_UPDATE;
+            apply_pending_screen_now_from_web();
+        }
+        data_dirty = true;
+        return;
+    }
+
+    const bool fw_current = current_screen_id == SCREEN_ID_PAGE_FW_UPDATE;
+    const bool fw_pending = pending_screen_id == SCREEN_ID_PAGE_FW_UPDATE;
+    firmware_update_screen_active_ = false;
+
+    if (!fw_current && !fw_pending) {
+        return;
+    }
+
+    int restore_screen = firmware_update_return_screen_id_;
+    if (!is_restore_target(restore_screen)) {
+        restore_screen = SCREEN_ID_PAGE_SETTINGS;
+    }
+    pending_screen_id = restore_screen;
+    apply_pending_screen_now_from_web();
+    data_dirty = true;
+}
+
 void UiController::webRequestRestart() {
     LOGW("UI", "web restart requested");
     delay(100);
@@ -461,6 +517,10 @@ void UiController::poll(uint32_t now) {
         // Flush may stay idle on static screens; do not treat flush-only inactivity as a fatal stall.
         const bool stall_suspected = !lvgl_diag.paused &&
                                      (handler_stall || vsync_stall);
+        const bool firmware_update_watchdog_exempt =
+            firmware_update_screen_active_ ||
+            current_screen_id == SCREEN_ID_PAGE_FW_UPDATE ||
+            pending_screen_id == SCREEN_ID_PAGE_FW_UPDATE;
         if (stall_suspected) {
             if (!lvgl_diag_stall_active) {
                 lvgl_diag_stall_since_ms = now;
@@ -485,14 +545,21 @@ void UiController::poll(uint32_t now) {
             lvgl_diag_stall_active = true;
 
             if ((now - lvgl_diag_stall_since_ms) >= UI_LVGL_DIAG_REBOOT_STALL_MS) {
-                const uint32_t stall_for_ms = now - lvgl_diag_stall_since_ms;
-                LOGE("UI",
-                     "LVGL stall persisted %lu ms, scheduling controlled reboot",
-                     static_cast<unsigned long>(stall_for_ms));
-                boot_mark_ui_auto_recovery_reboot();
-                delay(UI_LVGL_DIAG_REBOOT_FLUSH_LOG_MS);
-                esp_restart();
-                return;
+                if (firmware_update_watchdog_exempt) {
+                    if (can_log) {
+                        LOGW("UI", "LVGL stall persisted during firmware update screen, auto-reboot suppressed");
+                    }
+                    lvgl_diag_stall_since_ms = now;
+                } else {
+                    const uint32_t stall_for_ms = now - lvgl_diag_stall_since_ms;
+                    LOGE("UI",
+                         "LVGL stall persisted %lu ms, scheduling controlled reboot",
+                         static_cast<unsigned long>(stall_for_ms));
+                    boot_mark_ui_auto_recovery_reboot();
+                    delay(UI_LVGL_DIAG_REBOOT_FLUSH_LOG_MS);
+                    esp_restart();
+                    return;
+                }
             }
         } else if (lvgl_diag_stall_active &&
                    handler_age_known &&

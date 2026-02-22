@@ -43,6 +43,7 @@ Click the image.
 - Professional telemetry: PM2.5/PM10, CO2, VOC, NOx, temperature, humidity, absolute humidity (AH), pressure, HCHO.
 - No soldering required: designed for easy assembly using Grove/QT connectors.
 - Smooth LVGL UI with night mode, custom themes, and status indicators.
+- Integrated web dashboard at `/dashboard` with live state, charts, events, settings sync, and OTA firmware update.
 - Easy setup: Wi-Fi AP onboarding + mDNS portal (http://aura.local) for configuration.
 - Home Assistant ready: automatic MQTT discovery and ready-to-use dashboard code.
 - Robust Safe Boot: automatic rollback to the last-known-good config after crashes.

@@ -124,6 +124,7 @@ const svgIcon = (draw) => ({ size = 14, className = "" }) => (
 const Moon = svgIcon(<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 1 0 9.8 9.8z" />);
 const Sun = svgIcon(<><circle cx="12" cy="12" r="4" /><path d="M12 2v2.2M12 19.8V22M4.2 4.2l1.6 1.6M18.2 18.2l1.6 1.6M2 12h2.2M19.8 12H22M4.2 19.8l1.6-1.6M18.2 5.8l1.6-1.6" /></>);
 const RotateCw = svgIcon(<><path d="M21 2v6h-6" /><path d="M3 12a9 9 0 0 1 15-6.7L21 8" /><path d="M3 22v-6h6" /><path d="M21 12a9 9 0 0 1-15 6.7L3 16" /></>);
+const UploadIcon = svgIcon(<><path d="M12 16V4" /><path d="m7 9 5-5 5 5" /><path d="M20 16.5v1a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 17.5v-1" /></>);
 const Pencil = svgIcon(<><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z" /></>);
 const Check = svgIcon(<path d="M20 6 9 17l-5-5" />);
 const X = svgIcon(<path d="m6 6 12 12M18 6 6 18" />);
@@ -488,6 +489,16 @@ const formatMetricValue = (value, decimals = 1) =>
 const formatSignedMetricValue = (value, decimals = 1) => {
   if (!isFiniteNumber(value)) return 'N/A';
   return `${value > 0 ? '+' : ''}${Number(value).toFixed(decimals)}`;
+};
+
+const formatFileSize = (bytes) => {
+  const value = Number(bytes);
+  if (!Number.isFinite(value) || value <= 0) return '0 B';
+  if (value < 1024) return `${Math.round(value)} B`;
+  const kb = value / 1024;
+  if (kb < 1024) return `${kb.toFixed(1)} KB`;
+  const mb = kb / 1024;
+  return `${mb.toFixed(2)} MB`;
 };
 
 const splitSeriesSegments = (points) => {
@@ -1181,6 +1192,17 @@ const TabIcon = ({ id }) => {
     );
   }
 
+  if (id === "system") {
+    return (
+      <svg viewBox="0 0 24 24" className={base} aria-hidden="true">
+        <rect {...stroke} x="4.5" y="5" width="15" height="10.5" rx="2.2" />
+        <path {...stroke} d="M8 9h5M8 11.8h7" />
+        <circle {...stroke} cx="16.2" cy="9.4" r="1.2" />
+        <path {...stroke} d="M9 19h6M12 15.5V19" />
+      </svg>
+    );
+  }
+
   return (
     <svg viewBox="0 0 24 24" className={base} aria-hidden="true">
       <path {...stroke} d="M4 7h16" />
@@ -1312,6 +1334,11 @@ function AuraDashboard() {
   const [savedSettings, setSavedSettings] = useState(DEFAULT_WEB_SETTINGS);
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsSaveStatus, setSettingsSaveStatus] = useState('idle'); // idle | saved | error
+  const otaFileInputRef = React.useRef(null);
+  const [otaFile, setOtaFile] = useState(null);
+  const [otaUploadState, setOtaUploadState] = useState('idle'); // idle | uploading | success | error
+  const [otaUploadProgress, setOtaUploadProgress] = useState(0);
+  const [otaUploadMessage, setOtaUploadMessage] = useState('');
 
   // Device Name Editing
   const [deviceName, setDeviceName] = useState(PREVIEW_HOSTNAME);
@@ -1431,6 +1458,78 @@ function AuraDashboard() {
 
   const requestRestart = () => {
     postSettingsPatch({ restart: true }).catch(() => {});
+  };
+
+  const selectFirmwareFile = (event) => {
+    const file = event?.target?.files?.[0] || null;
+    setOtaFile(file);
+    setOtaUploadState('idle');
+    setOtaUploadProgress(0);
+    if (file) {
+      setOtaUploadMessage(`${file.name} (${formatFileSize(file.size)})`);
+    } else {
+      setOtaUploadMessage('');
+    }
+  };
+
+  const uploadFirmware = () => {
+    if (!otaFile || otaUploadState === 'uploading') return;
+    if (otaFile.size <= 0) {
+      setOtaUploadState('error');
+      setOtaUploadMessage('Selected file is empty.');
+      return;
+    }
+
+    const xhr = new XMLHttpRequest();
+    const formData = new FormData();
+    formData.append('ota_size', String(otaFile.size));
+    formData.append('firmware', otaFile, otaFile.name);
+
+    setOtaUploadState('uploading');
+    setOtaUploadProgress(0);
+    setOtaUploadMessage('Uploading firmware...');
+
+    xhr.open('POST', '/api/ota', true);
+    xhr.upload.onprogress = (event) => {
+      if (!event.lengthComputable || event.total <= 0) return;
+      const progress = Math.min(100, Math.round((event.loaded / event.total) * 100));
+      setOtaUploadProgress(progress);
+    };
+
+    xhr.onreadystatechange = () => {
+      if (xhr.readyState !== XMLHttpRequest.DONE) return;
+
+      let payload = null;
+      try {
+        payload = JSON.parse(xhr.responseText || '{}');
+      } catch (e) {
+        payload = null;
+      }
+
+      if (xhr.status >= 200 && xhr.status < 300 && payload?.success === true) {
+        setOtaUploadState('success');
+        setOtaUploadProgress(100);
+        setOtaUploadMessage(payload?.message || 'Firmware uploaded. Device will reboot.');
+        setOtaFile(null);
+        if (otaFileInputRef.current) {
+          otaFileInputRef.current.value = '';
+        }
+        return;
+      }
+
+      const errorText =
+        (payload && typeof payload.error === 'string' && payload.error.trim()) ||
+        `Upload failed (HTTP ${xhr.status || 0})`;
+      setOtaUploadState('error');
+      setOtaUploadMessage(errorText);
+    };
+
+    xhr.onerror = () => {
+      setOtaUploadState('error');
+      setOtaUploadMessage('Upload failed. Check network connection and retry.');
+    };
+
+    xhr.send(formData);
   };
 
   useEffect(() => {
@@ -1690,6 +1789,7 @@ function AuraDashboard() {
     { id: 'charts', label: 'Charts' },
     { id: 'events', label: 'Events' },
     { id: 'settings', label: 'Settings' },
+    { id: 'system', label: 'System' },
   ];
 
   return (
@@ -1993,29 +2093,86 @@ function AuraDashboard() {
                 </div>
               </SettingGroup>
 
-              <SettingGroup title="System">
-                <div className="space-y-1">
-                  <SettingInfoRow label="Firmware" value={firmwareVersion} valueClassName="text-gray-200 text-sm" mono />
-                  <SettingInfoRow label="Build" value={firmwareBuild} valueClassName="text-gray-300 text-sm" mono />
-                  <SettingInfoRow label="Uptime" value={uptime} valueClassName="text-gray-200 text-sm" mono />
-                  <SettingInfoRow label="Web URL" value={localWebUrl} valueClassName="text-cyan-300 text-sm" mono />
-                </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'system' && (
+        <div className="space-y-3 md:space-y-4 animate-in fade-in duration-300">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4 items-start">
+            <SettingGroup title="System">
+              <div className="space-y-1">
+                <SettingInfoRow label="Firmware" value={firmwareVersion} valueClassName="text-gray-200 text-sm" mono />
+                <SettingInfoRow label="Build" value={firmwareBuild} valueClassName="text-gray-300 text-sm" mono />
+                <SettingInfoRow label="Uptime" value={uptime} valueClassName="text-gray-200 text-sm" mono />
+                <SettingInfoRow label="Web URL" value={localWebUrl} valueClassName="text-cyan-300 text-sm" mono />
+              </div>
+              <div className="mt-3 pt-3 border-t border-gray-700/60 space-y-2">
                 <button
                   onClick={requestRestart}
-                  className="w-full mt-2 border py-2.5 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/40 transition-colors"
+                  disabled={otaUploadState === 'uploading'}
+                  className="w-full border py-2.5 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/40 transition-colors"
                 >
                   <RotateCw size={14} /> Reboot Device
                 </button>
                 {dacAvailable && (
                   <button
                     onClick={() => { window.location.href = '/dac'; }}
-                    className="w-full mt-2 border py-2.5 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-colors"
+                    className="w-full border py-2.5 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-colors"
                   >
                     DAC Settings
                   </button>
                 )}
-              </SettingGroup>
-            </div>
+              </div>
+            </SettingGroup>
+
+            <SettingGroup title="Firmware Update">
+              <input
+                ref={otaFileInputRef}
+                type="file"
+                accept=".bin"
+                onChange={selectFirmwareFile}
+                disabled={otaUploadState === 'uploading'}
+                className="block w-full text-xs text-gray-300 file:mr-3 file:rounded-md file:border file:border-gray-600 file:bg-gray-800 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-gray-200 hover:file:bg-gray-700 disabled:opacity-60 disabled:cursor-not-allowed"
+              />
+              <button
+                onClick={uploadFirmware}
+                disabled={!otaFile || otaUploadState === 'uploading'}
+                className={`w-full mt-2 border py-2.5 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-colors ${
+                  !otaFile || otaUploadState === 'uploading'
+                    ? 'bg-gray-800/70 text-gray-500 border-gray-700 cursor-not-allowed'
+                    : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/40'
+                }`}
+              >
+                <UploadIcon size={14} />
+                {otaUploadState === 'uploading' ? 'Uploading...' : 'Update Firmware'}
+              </button>
+              {otaUploadState === 'uploading' && (
+                <div className="mt-2">
+                  <div className="h-1.5 rounded-full bg-gray-800 border border-gray-700 overflow-hidden">
+                    <div
+                      className="h-full bg-amber-400 transition-all duration-150"
+                      style={{ width: `${otaUploadProgress}%` }}
+                    />
+                  </div>
+                  <div className="mt-1 text-[11px] text-amber-300/90 text-right">{otaUploadProgress}%</div>
+                </div>
+              )}
+              {otaUploadMessage && (
+                <div
+                  className={`mt-2 text-[11px] ${
+                    otaUploadState === 'success'
+                      ? 'text-emerald-300/90'
+                      : otaUploadState === 'error'
+                        ? 'text-red-300/90'
+                        : 'text-gray-400'
+                  }`}
+                >
+                  {otaUploadMessage}
+                </div>
+              )}
+            </SettingGroup>
           </div>
         </div>
       )}

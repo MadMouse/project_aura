@@ -281,3 +281,4 @@
     "Acceptable: >250-600 #/cm3\nNormaler Innenraum, keine Aktion noetig",
     "Uncomfortable: >600-1200 #/cm3\nQuelle erkannt, lueften oder Reiniger nutzen",
     "Poor: >1200 #/cm3\nHoher Wert, Quelle finden und Luft verbessern",
+    "Firmware-Update\nUpdate wird installiert...\nGeraet nicht ausschalten.\nGeraet startet automatisch neu.",

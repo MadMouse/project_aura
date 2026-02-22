@@ -10693,6 +10693,71 @@ void create_screen_page_dac_settings() {
 void tick_screen_page_dac_settings() {
 }
 
+void create_screen_page_fw_update() {
+    lv_obj_t *obj = lv_obj_create(0);
+    objects.page_fw_update = obj;
+    lv_obj_set_pos(obj, 0, 0);
+    lv_obj_set_size(obj, 800, 480);
+    {
+        lv_obj_t *parent_obj = obj;
+        {
+            // background_fw_update
+            lv_obj_t *obj = lv_obj_create(parent_obj);
+            objects.background_fw_update = obj;
+            lv_obj_set_pos(obj, 0, 0);
+            lv_obj_set_size(obj, 800, 480);
+            lv_obj_set_style_pad_left(obj, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_pad_top(obj, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_pad_right(obj, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_pad_bottom(obj, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_border_width(obj, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_radius(obj, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+            add_style_style_screen_bg(obj);
+            lv_obj_set_style_bg_opa(obj, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+            {
+                lv_obj_t *parent_obj = obj;
+                {
+                    // card_fw_update
+                    lv_obj_t *obj = lv_obj_create(parent_obj);
+                    objects.card_fw_update = obj;
+                    lv_obj_set_pos(obj, 142, 154);
+                    lv_obj_set_size(obj, 516, 172);
+                    lv_obj_set_style_pad_left(obj, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+                    lv_obj_set_style_pad_top(obj, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+                    lv_obj_set_style_pad_right(obj, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+                    lv_obj_set_style_pad_bottom(obj, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+                    lv_obj_add_flag(obj, LV_OBJ_FLAG_CHECKABLE);
+                    lv_obj_clear_flag(obj, LV_OBJ_FLAG_CLICK_FOCUSABLE|LV_OBJ_FLAG_GESTURE_BUBBLE|LV_OBJ_FLAG_PRESS_LOCK|LV_OBJ_FLAG_SCROLLABLE|LV_OBJ_FLAG_SCROLL_CHAIN_HOR|LV_OBJ_FLAG_SCROLL_CHAIN_VER|LV_OBJ_FLAG_SCROLL_ELASTIC|LV_OBJ_FLAG_SCROLL_MOMENTUM|LV_OBJ_FLAG_SCROLL_WITH_ARROW|LV_OBJ_FLAG_SNAPPABLE);
+                    add_style_style_card_base(obj);
+                    lv_obj_set_style_border_width(obj, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
+                    lv_obj_set_style_radius(obj, 15, LV_PART_MAIN | LV_STATE_DEFAULT);
+                    lv_obj_set_style_bg_opa(obj, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+                    {
+                        lv_obj_t *parent_obj = obj;
+                        {
+                            // label_fw_update
+                            lv_obj_t *obj = lv_label_create(parent_obj);
+                            objects.label_fw_update = obj;
+                            lv_obj_set_pos(obj, 39, 44);
+                            lv_obj_set_size(obj, 435, LV_SIZE_CONTENT);
+                            lv_obj_clear_flag(obj, LV_OBJ_FLAG_CLICK_FOCUSABLE|LV_OBJ_FLAG_GESTURE_BUBBLE|LV_OBJ_FLAG_PRESS_LOCK|LV_OBJ_FLAG_SCROLLABLE|LV_OBJ_FLAG_SCROLL_CHAIN_HOR|LV_OBJ_FLAG_SCROLL_CHAIN_VER|LV_OBJ_FLAG_SCROLL_ELASTIC|LV_OBJ_FLAG_SCROLL_MOMENTUM|LV_OBJ_FLAG_SCROLL_WITH_ARROW|LV_OBJ_FLAG_SNAPPABLE);
+                            add_style_style_text_primary(obj);
+                            lv_obj_set_style_text_font(obj, &ui_font_jet_reg_18, LV_PART_MAIN | LV_STATE_DEFAULT);
+                            lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+                            lv_label_set_text(obj, "Firmware Update\nInstalling update...\nDo not power off the device.\nDevice will reboot automatically.");
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    tick_screen_page_fw_update();
+}
+
+void tick_screen_page_fw_update() {
+}
+
 
 
 typedef void (*tick_screen_func_t)();
@@ -10710,6 +10775,7 @@ tick_screen_func_t tick_screen_funcs[] = {
     tick_screen_page_mqtt,
     tick_screen_page_sensors_info,
     tick_screen_page_dac_settings,
+    tick_screen_page_fw_update,
 };
 void tick_screen(int screen_index) {
     tick_screen_funcs[screen_index]();
@@ -10736,4 +10802,5 @@ void create_screens() {
     create_screen_page_mqtt();
     create_screen_page_sensors_info();
     create_screen_page_dac_settings();
+    create_screen_page_fw_update();
 }

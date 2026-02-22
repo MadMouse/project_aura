@@ -41,6 +41,8 @@ lv_obj_t *UiEventBinder::screenRootById(int screen_id) {
             return objects.page_sensors_info;
         case SCREEN_ID_PAGE_DAC_SETTINGS:
             return objects.page_dac_settings;
+        case SCREEN_ID_PAGE_FW_UPDATE:
+            return objects.page_fw_update;
         default:
             return nullptr;
     }

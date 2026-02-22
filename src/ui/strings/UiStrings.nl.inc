@@ -281,3 +281,4 @@
     "Acceptable: >250-600 #/cm3\nNormale binnenlucht, geen actie nodig",
     "Uncomfortable: >600-1200 #/cm3\nBron gedetecteerd, ventileer of gebruik filter",
     "Poor: >1200 #/cm3\nHoge telling, zoek bron en verbeter luchtstroom",
+    "Firmware-update\nUpdate wordt geinstalleerd...\nSchakel het apparaat niet uit.\nHet apparaat start automatisch opnieuw op.",

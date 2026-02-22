@@ -192,6 +192,7 @@ void AuraNetworkManager::registerServerRoutes() {
     server_.on("/api/state", HTTP_GET, state_handle_data);
     server_.on("/api/events", HTTP_GET, events_handle_data);
     server_.on("/api/settings", HTTP_POST, settings_handle_update);
+    server_.on("/api/ota", HTTP_POST, ota_handle_update, ota_handle_upload);
     server_.onNotFound(wifi_handle_not_found);
     server_routes_registered_ = true;
 }

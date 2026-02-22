@@ -82,3 +82,5 @@ void charts_handle_data();
 void state_handle_data();
 void events_handle_data();
 void settings_handle_update();
+void ota_handle_update();
+void ota_handle_upload();

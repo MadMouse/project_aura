@@ -237,6 +237,10 @@ void UiController::update_co2_calib_texts() {
     if (objects.label_co2_calib_fresh_text) safe_label_set_text(objects.label_co2_calib_fresh_text, UiText::LabelCo2CalibFreshInfo());
 }
 
+void UiController::update_fw_update_texts() {
+    if (objects.label_fw_update) safe_label_set_text(objects.label_fw_update, UiText::LabelFwUpdateScreen());
+}
+
 void UiController::update_boot_diag_texts() {
     if (objects.label_btn_diag_continue) safe_label_set_text(objects.label_btn_diag_continue, UiText::LabelBootTapToContinue());
     if (objects.lbl_diag_title) safe_label_set_text(objects.lbl_diag_title, UiText::LabelBootDiagTitle());

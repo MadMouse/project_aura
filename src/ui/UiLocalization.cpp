@@ -102,6 +102,7 @@ void UiLocalization::updateLanguageFonts(UiController &owner) {
         objects.page_mqtt,
         objects.page_sensors_info,
         objects.page_dac_settings,
+        objects.page_fw_update,
     };
 
     for (lv_obj_t *root : roots) {
@@ -145,6 +146,9 @@ void UiLocalization::refreshTextsForScreen(UiController &owner, int screen_id) {
             break;
         case SCREEN_ID_PAGE_DAC_SETTINGS:
             break;
+        case SCREEN_ID_PAGE_FW_UPDATE:
+            owner.update_fw_update_texts();
+            break;
         case SCREEN_ID_PAGE_BOOT_DIAG:
             owner.update_boot_diag_texts();
             break;
@@ -171,6 +175,7 @@ void UiLocalization::refreshAllTexts(UiController &owner) {
     owner.update_auto_night_texts();
     owner.update_backlight_texts();
     owner.update_co2_calib_texts();
+    owner.update_fw_update_texts();
     owner.update_boot_diag_texts();
     updateLanguageFonts(owner);
 }

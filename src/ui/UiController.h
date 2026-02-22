@@ -71,6 +71,7 @@ public:
     bool webSetBacklight(bool enabled);
     bool webSetUnitsC(bool units_c);
     bool webSetOffsets(float temp_offset_c, float hum_offset_pct);
+    void webSetFirmwareUpdateScreen(bool active);
     void webRequestRestart();
 
 private:
@@ -135,6 +136,7 @@ private:
     void update_auto_night_texts();
     void update_backlight_texts();
     void update_co2_calib_texts();
+    void update_fw_update_texts();
     void update_boot_diag_texts();
     void update_dac_ui(uint32_t now_ms);
     void update_led_indicators();
@@ -195,6 +197,7 @@ private:
     void night_mode_on_enter();
     void night_mode_on_exit();
     void set_night_mode_state(bool enabled, bool save_pref);
+    void apply_pending_screen_now_from_web();
 
     void mqtt_apply_pending();
     void bind_screen_events_once(int screen_id);
@@ -460,7 +463,7 @@ private:
 
     bool data_dirty = true;
     bool lvgl_ready = false;
-    static constexpr size_t kScreenSlotCount = 14; // screen ids are 1..13
+    static constexpr size_t kScreenSlotCount = 15; // screen ids are 1..14
     bool screen_events_bound_[kScreenSlotCount] = {};
     bool theme_events_bound_ = false;
     int pending_screen_id = 0;
@@ -514,6 +517,8 @@ private:
     uint32_t lvgl_diag_last_stall_warn_ms = 0;
     bool lvgl_diag_stall_active = false;
     uint32_t lvgl_diag_stall_since_ms = 0;
+    bool firmware_update_screen_active_ = false;
+    int firmware_update_return_screen_id_ = 0;
     UiDeferredUnload deferred_unload_;
     bool boot_logo_active = false;
     uint32_t boot_logo_start_ms = 0;

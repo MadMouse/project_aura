@@ -9,9 +9,11 @@
 #include <math.h>
 #include <time.h>
 #include <WiFi.h>
+#include <Update.h>
 #include <WebServer.h>
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
+#include <esp_ota_ops.h>
 #include <lvgl.h>
 #include "lvgl_v8_port.h"
 #include "config/AppConfig.h"
@@ -42,6 +44,14 @@ uint32_t g_deferred_mqtt_sync_due_ms = 0;
 constexpr uint32_t kChartStepS = Config::CHART_HISTORY_STEP_MS / 1000UL;
 constexpr size_t kEventsApiMaxEntries = 48;
 Logger::RecentEntry g_events_snapshot[kEventsApiMaxEntries];
+bool g_ota_upload_seen = false;
+bool g_ota_upload_active = false;
+bool g_ota_upload_success = false;
+bool g_ota_size_known = false;
+size_t g_ota_expected_size = 0;
+size_t g_ota_slot_size = 0;
+size_t g_ota_written_size = 0;
+String g_ota_error;
 
 struct ChartMetricSpec {
     const char *key;
@@ -138,6 +148,59 @@ bool chart_latest_metric(const ChartsHistory &history,
 
 bool deadline_reached(uint32_t now_ms, uint32_t due_ms) {
     return static_cast<int32_t>(now_ms - due_ms) >= 0;
+}
+
+void ota_reset_state() {
+    g_ota_upload_seen = false;
+    g_ota_upload_active = false;
+    g_ota_upload_success = false;
+    g_ota_size_known = false;
+    g_ota_expected_size = 0;
+    g_ota_slot_size = 0;
+    g_ota_written_size = 0;
+    g_ota_error = "";
+}
+
+void ota_set_ui_screen(bool active) {
+    WebHandlerContext *context = ctx();
+    if (!context || !context->ui_controller) {
+        return;
+    }
+    context->ui_controller->webSetFirmwareUpdateScreen(active);
+}
+
+bool parse_size_arg(const String &value, size_t &out) {
+    String trimmed = value;
+    trimmed.trim();
+    if (trimmed.isEmpty()) {
+        return false;
+    }
+    char *end = nullptr;
+    const unsigned long long parsed = strtoull(trimmed.c_str(), &end, 10);
+    if (!end || *end != '\0') {
+        return false;
+    }
+    if (parsed == 0 || parsed > static_cast<unsigned long long>(SIZE_MAX)) {
+        return false;
+    }
+    out = static_cast<size_t>(parsed);
+    return true;
+}
+
+String ota_error_prefixed(const char *prefix) {
+    String error = prefix;
+    error += ": ";
+    error += Update.errorString();
+    return error;
+}
+
+void ota_set_error(const String &error) {
+    if (g_ota_error.isEmpty()) {
+        g_ota_error = error;
+    }
+    g_ota_upload_success = false;
+    g_ota_upload_active = false;
+    ota_set_ui_screen(false);
 }
 
 String html_escape(const String &input) {
@@ -315,6 +378,7 @@ void WebHandlersInit(WebHandlerContext *context) {
     g_deferred_mqtt_sync = false;
     g_deferred_wifi_start_sta_due_ms = 0;
     g_deferred_mqtt_sync_due_ms = 0;
+    ota_reset_state();
 }
 
 void WebHandlersPollDeferred() {
@@ -1264,6 +1328,196 @@ void settings_handle_update() {
     if (restart_requested) {
         ui.webRequestRestart();
     }
+}
+
+void ota_handle_upload() {
+    WebHandlerContext *context = ctx();
+    if (!context || !context->server) {
+        return;
+    }
+
+    WebServer &server = *context->server;
+    HTTPUpload &upload = server.upload();
+
+    if (upload.status == UPLOAD_FILE_START) {
+        ota_reset_state();
+        g_ota_upload_seen = true;
+        g_ota_upload_active = true;
+        ota_set_ui_screen(true);
+
+        const esp_partition_t *target_partition = esp_ota_get_next_update_partition(nullptr);
+        if (!target_partition) {
+            ota_set_error("OTA partition unavailable");
+            LOGE("OTA", "no target partition");
+            return;
+        }
+        g_ota_slot_size = target_partition->size;
+
+        size_t expected_size = 0;
+        g_ota_size_known = parse_size_arg(server.arg("ota_size"), expected_size);
+        if (g_ota_size_known) {
+            g_ota_expected_size = expected_size;
+            if (g_ota_expected_size > g_ota_slot_size) {
+                ota_set_error(String("Firmware too large for OTA slot: ") +
+                              String(g_ota_expected_size) + " > " + String(g_ota_slot_size));
+                LOGW("OTA", "reject oversized image: %u > %u",
+                     static_cast<unsigned>(g_ota_expected_size),
+                     static_cast<unsigned>(g_ota_slot_size));
+                return;
+            }
+            if (!Update.begin(g_ota_expected_size, U_FLASH)) {
+                ota_set_error(ota_error_prefixed("Update begin failed"));
+                LOGE("OTA", "%s", g_ota_error.c_str());
+                return;
+            }
+        } else {
+            g_ota_expected_size = 0;
+            if (!Update.begin(g_ota_slot_size, U_FLASH)) {
+                ota_set_error(ota_error_prefixed("Update begin failed"));
+                LOGE("OTA", "%s", g_ota_error.c_str());
+                return;
+            }
+        }
+
+        LOGI("OTA", "upload started (slot=%u, expected=%u, known=%s)",
+             static_cast<unsigned>(g_ota_slot_size),
+             static_cast<unsigned>(g_ota_expected_size),
+             g_ota_size_known ? "YES" : "NO");
+        return;
+    }
+
+    if (upload.status == UPLOAD_FILE_WRITE) {
+        if (!g_ota_upload_active || !g_ota_error.isEmpty()) {
+            return;
+        }
+        if (upload.currentSize == 0) {
+            return;
+        }
+        if (g_ota_written_size + upload.currentSize > g_ota_slot_size) {
+            if (Update.isRunning()) {
+                Update.abort();
+            }
+            ota_set_error(String("Firmware too large for OTA slot: ") +
+                          String(g_ota_written_size + upload.currentSize) +
+                          " > " + String(g_ota_slot_size));
+            LOGW("OTA", "upload exceeded slot size");
+            return;
+        }
+        if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
+            if (Update.isRunning()) {
+                Update.abort();
+            }
+            ota_set_error(ota_error_prefixed("Update write failed"));
+            LOGE("OTA", "%s", g_ota_error.c_str());
+            return;
+        }
+        g_ota_written_size += upload.currentSize;
+        return;
+    }
+
+    if (upload.status == UPLOAD_FILE_END) {
+        if (!g_ota_upload_active || !g_ota_error.isEmpty()) {
+            if (Update.isRunning()) {
+                Update.abort();
+            }
+            return;
+        }
+        if (g_ota_size_known && g_ota_expected_size > 0 && g_ota_written_size != g_ota_expected_size) {
+            if (Update.isRunning()) {
+                Update.abort();
+            }
+            ota_set_error(String("Firmware size mismatch: expected ") +
+                          String(g_ota_expected_size) + ", got " + String(g_ota_written_size));
+            LOGW("OTA", "size mismatch");
+            return;
+        }
+        if (!Update.end(true)) {
+            ota_set_error(ota_error_prefixed("Update finalize failed"));
+            LOGE("OTA", "%s", g_ota_error.c_str());
+            return;
+        }
+        g_ota_upload_success = true;
+        g_ota_upload_active = false;
+        LOGI("OTA", "upload complete, written=%u bytes", static_cast<unsigned>(g_ota_written_size));
+        return;
+    }
+
+    if (upload.status == UPLOAD_FILE_ABORTED) {
+        if (Update.isRunning()) {
+            Update.abort();
+        }
+        ota_set_error("Upload aborted");
+        LOGW("OTA", "upload aborted");
+    }
+}
+
+void ota_handle_update() {
+    WebHandlerContext *context = ctx();
+    if (!context || !context->server) {
+        return;
+    }
+
+    WebServer &server = *context->server;
+    const bool has_upload = g_ota_upload_seen;
+    const bool success = has_upload && g_ota_upload_success && g_ota_error.isEmpty();
+    const size_t written_size = g_ota_written_size;
+    const size_t slot_size = g_ota_slot_size;
+    const bool size_known = g_ota_size_known;
+    const size_t expected_size = g_ota_expected_size;
+    String error = g_ota_error;
+
+    if (!has_upload && error.isEmpty()) {
+        error = "Firmware file is missing";
+    } else if (!success && error.isEmpty()) {
+        error = "OTA update failed";
+    }
+
+    int status_code = 200;
+    if (!success) {
+        if (error.indexOf("too large") >= 0) {
+            status_code = 413;
+        } else if (error.indexOf("missing") >= 0 ||
+                   error.indexOf("aborted") >= 0 ||
+                   error.indexOf("mismatch") >= 0) {
+            status_code = 400;
+        } else {
+            status_code = 500;
+        }
+    }
+
+    ArduinoJson::JsonDocument doc;
+    doc["success"] = success;
+    doc["written"] = static_cast<uint32_t>(written_size);
+    doc["slot_size"] = static_cast<uint32_t>(slot_size);
+    if (size_known) {
+        doc["expected"] = static_cast<uint32_t>(expected_size);
+    } else {
+        doc["expected"] = nullptr;
+    }
+
+    if (success) {
+        doc["message"] = "Firmware uploaded. Device will reboot.";
+        doc["rebooting"] = true;
+    } else {
+        doc["error"] = error;
+        doc["rebooting"] = false;
+    }
+
+    String json;
+    serializeJson(doc, json);
+    if (success) {
+        server.client().setNoDelay(true);
+    }
+    server.send(status_code, "application/json", json);
+
+    if (success) {
+        delay(120);
+        server.client().stop();
+        ESP.restart();
+    } else {
+        ota_set_ui_screen(false);
+    }
+    ota_reset_state();
 }
 
 void events_handle_data() {

@@ -281,3 +281,4 @@
     "Acceptable: >250-600 #/cm3\nInterior normal, sin accion necesaria",
     "Uncomfortable: >600-1200 #/cm3\nFuente detectada, ventila o usa purificador",
     "Poor: >1200 #/cm3\nConteo alto, identifica fuente y mejora el aire",
+    "Actualizacion de firmware\nInstalando actualizacion...\nNo apagues el dispositivo.\nEl dispositivo se reiniciara automaticamente.",

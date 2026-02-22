@@ -25,7 +25,7 @@ void ui_tick() {
 #include <stddef.h>
 #include <string.h>
 
-enum { UI_KNOWN_SCREEN_COUNT = SCREEN_ID_PAGE_DAC_SETTINGS };
+enum { UI_KNOWN_SCREEN_COUNT = SCREEN_ID_PAGE_FW_UPDATE };
 enum { UI_PAGE_SLOT_COUNT = (int)(offsetof(objects_t, label_boot_ver) / sizeof(lv_obj_t *)) };
 enum { UI_OBJECT_SLOT_COUNT = (int)(sizeof(objects_t) / sizeof(lv_obj_t *)) };
 
@@ -37,11 +37,11 @@ enum { UI_OBJECT_SLOT_COUNT = (int)(sizeof(objects_t) / sizeof(lv_obj_t *)) };
 
 UI_STATIC_ASSERT(UI_PAGE_SLOT_COUNT == UI_KNOWN_SCREEN_COUNT,
                  "EEZ page layout changed: update ui_runtime screen tables.");
-UI_STATIC_ASSERT(SCREEN_ID_PAGE_DAC_SETTINGS == UI_KNOWN_SCREEN_COUNT,
-                 "Expected DAC settings to be last screen id; update ui_runtime mapping.");
+UI_STATIC_ASSERT(SCREEN_ID_PAGE_FW_UPDATE == UI_KNOWN_SCREEN_COUNT,
+                 "Expected firmware update to be last screen id; update ui_runtime mapping.");
 UI_STATIC_ASSERT(offsetof(objects_t, page_boot_logo) == 0,
                  "objects_t must start with page_boot_logo.");
-UI_STATIC_ASSERT((offsetof(objects_t, page_dac_settings) + sizeof(lv_obj_t *)) ==
+UI_STATIC_ASSERT((offsetof(objects_t, page_fw_update) + sizeof(lv_obj_t *)) ==
                      (UI_PAGE_SLOT_COUNT * sizeof(lv_obj_t *)),
                  "Page roots must stay contiguous; update ui_runtime mapping.");
 UI_STATIC_ASSERT((sizeof(objects_t) % sizeof(lv_obj_t *)) == 0,
@@ -82,6 +82,8 @@ static lv_obj_t *getLvglObjectFromScreenId(enum ScreensEnum screenId) {
             return objects.page_sensors_info;
         case SCREEN_ID_PAGE_DAC_SETTINGS:
             return objects.page_dac_settings;
+        case SCREEN_ID_PAGE_FW_UPDATE:
+            return objects.page_fw_update;
         case SCREEN_ID_PAGE_MAIN_PRO:
             return objects.page_main_pro;
         default:
@@ -131,6 +133,7 @@ static const create_screen_func_t screen_create_funcs[UI_MAX_SCREEN_ID + 1] = {
     [SCREEN_ID_PAGE_MQTT] = create_screen_page_mqtt,
     [SCREEN_ID_PAGE_SENSORS_INFO] = create_screen_page_sensors_info,
     [SCREEN_ID_PAGE_DAC_SETTINGS] = create_screen_page_dac_settings,
+    [SCREEN_ID_PAGE_FW_UPDATE] = create_screen_page_fw_update,
 };
 
 static void createScreenById(enum ScreensEnum screenId) {
