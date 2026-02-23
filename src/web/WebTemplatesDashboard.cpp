@@ -24,10 +24,10 @@ const char kDashboardPageTemplate[] PROGMEM = R"HTML_DASH(
     };
   </script>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script crossorigin src="https://cdn.jsdelivr.net/npm/react@18/umd/react.development.js"
-          onerror="if(!this.dataset.fb){this.dataset.fb='1';this.src='https://unpkg.com/react@18/umd/react.development.js';}else{window.__auraDepFail('react', this.src);}"></script>
-  <script crossorigin src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.development.js"
-          onerror="if(!this.dataset.fb){this.dataset.fb='1';this.src='https://unpkg.com/react-dom@18/umd/react-dom.development.js';}else{window.__auraDepFail('react-dom', this.src);}"></script>
+  <script crossorigin src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js"
+          onerror="if(!this.dataset.fb){this.dataset.fb='1';this.src='https://unpkg.com/react@18/umd/react.production.min.js';}else{window.__auraDepFail('react', this.src);}"></script>
+  <script crossorigin src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js"
+          onerror="if(!this.dataset.fb){this.dataset.fb='1';this.src='https://unpkg.com/react-dom@18/umd/react-dom.production.min.js';}else{window.__auraDepFail('react-dom', this.src);}"></script>
   <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.7/babel.min.js"
           onerror="if(!this.dataset.fb){this.dataset.fb='1';this.src='https://unpkg.com/@babel/standalone@7.26.7/babel.min.js';}else{window.__auraDepFail('babel', this.src);}"></script>
   <style>
@@ -189,7 +189,7 @@ const parseChartApiPayload = (payload) => {
     }
   });
 
-  // Keep compatibility with current local keys.
+  // Backward-compat shim: /api/charts uses temperature/humidity, while /api/state uses temp/rh.
   points.forEach((point) => {
     if (Object.prototype.hasOwnProperty.call(point, 'temperature')) point.temp = point.temperature;
     if (Object.prototype.hasOwnProperty.call(point, 'humidity')) point.rh = point.humidity;
@@ -1727,7 +1727,12 @@ function AuraDashboard() {
   const chartLatestValues = useMemo(() => {
     const merged = { ...(chartApiLatest || {}) };
     Object.entries(current).forEach(([key, value]) => {
-      if (isFiniteNumber(value)) merged[key] = value;
+      if (!isFiniteNumber(value)) {
+        return;
+      }
+      merged[key] = value;
+      if (key === 'temp') merged.temperature = value;
+      if (key === 'rh') merged.humidity = value;
     });
     return merged;
   }, [chartApiLatest, current]);
