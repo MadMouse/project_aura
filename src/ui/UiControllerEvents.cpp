@@ -348,7 +348,7 @@ void UiController::on_wifi_settings_event(lv_event_t *e) {
     if (lv_event_get_code(e) != LV_EVENT_CLICKED) {
         return;
     }
-    sync_wifi_toggle_state();
+    update_wifi_ui();
     pending_screen_id = SCREEN_ID_PAGE_WIFI;
 }
 
@@ -456,7 +456,7 @@ void UiController::on_wifi_toggle_event(lv_event_t *e) {
         return;
     }
     networkManager.setEnabled(enabled);
-    sync_wifi_toggle_state();
+    update_wifi_ui();
     if (timeManager.updateWifiState(networkManager.isEnabled(), networkManager.isConnected())) {
         datetime_ui_dirty = true;
     }
@@ -510,8 +510,6 @@ void UiController::on_wifi_start_ap_event(lv_event_t *e) {
     if (lv_event_get_code(e) != LV_EVENT_CLICKED) {
         return;
     }
-    lv_obj_t *btn = lv_event_get_target(e);
-    show_wifi_action_feedback(btn);
     networkManager.startApOnDemand();
     update_wifi_ui();
     mqtt_sync_with_wifi();

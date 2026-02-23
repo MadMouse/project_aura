@@ -1566,6 +1566,22 @@ void UiController::init_ui_defaults() {
     if (objects.label_btn_mqtt) {
         lv_obj_set_style_text_color(objects.label_btn_mqtt, color_inactive(), LV_PART_MAIN | LV_STATE_DISABLED);
     }
+    if (objects.btn_wifi_reconnect) {
+        lv_obj_set_style_bg_color(objects.btn_wifi_reconnect, color_inactive(), LV_PART_MAIN | LV_STATE_DISABLED);
+        lv_obj_set_style_border_color(objects.btn_wifi_reconnect, color_inactive(), LV_PART_MAIN | LV_STATE_DISABLED);
+        lv_obj_set_style_shadow_color(objects.btn_wifi_reconnect, color_inactive(), LV_PART_MAIN | LV_STATE_DISABLED);
+    }
+    if (objects.label_btn_wifi_reconnect) {
+        lv_obj_set_style_text_color(objects.label_btn_wifi_reconnect, color_inactive(), LV_PART_MAIN | LV_STATE_DISABLED);
+    }
+    if (objects.btn_wifi_start_ap) {
+        lv_obj_set_style_bg_color(objects.btn_wifi_start_ap, color_inactive(), LV_PART_MAIN | LV_STATE_DISABLED);
+        lv_obj_set_style_border_color(objects.btn_wifi_start_ap, color_inactive(), LV_PART_MAIN | LV_STATE_DISABLED);
+        lv_obj_set_style_shadow_color(objects.btn_wifi_start_ap, color_inactive(), LV_PART_MAIN | LV_STATE_DISABLED);
+    }
+    if (objects.label_btn_wifi_start_ap) {
+        lv_obj_set_style_text_color(objects.label_btn_wifi_start_ap, color_inactive(), LV_PART_MAIN | LV_STATE_DISABLED);
+    }
     if (objects.btn_dac_settings) {
         lv_obj_set_style_bg_color(objects.btn_dac_settings, color_inactive(), LV_PART_MAIN | LV_STATE_DISABLED);
         lv_obj_set_style_border_color(objects.btn_dac_settings, color_inactive(), LV_PART_MAIN | LV_STATE_DISABLED);

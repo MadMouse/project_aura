@@ -11,6 +11,7 @@
 #include "ui/UiController.h"
 #include "ui/BacklightManager.h"
 #include "ui/ThemeManager.h"
+#include "modules/NetworkManager.h"
 #include "ui/ui.h"
 
 lv_obj_t *UiEventBinder::screenRootById(int screen_id) {
@@ -476,6 +477,9 @@ void UiEventBinder::applyCheckedStatesForAvailableObjects(UiController &owner, i
     set_checked(objects.btn_head_status, owner.header_status_enabled);
     set_checked(objects.btn_head_status_1, owner.backlightManager.isScheduleEnabled());
     set_checked(objects.btn_backlight_alarm_wake, owner.backlightManager.isAlarmWakeEnabled());
+    set_checked(objects.btn_wifi_start_ap,
+                owner.networkManager.isEnabled() &&
+                owner.networkManager.state() == AuraNetworkManager::WIFI_STATE_AP_CONFIG);
     set_checked(objects.btn_night_mode, owner.night_mode);
     set_checked(objects.btn_units_c_f, owner.temp_units_c);
     set_checked(objects.btn_units_mdy, owner.date_units_mdy);

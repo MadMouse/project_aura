@@ -240,6 +240,11 @@ void UiController::update_wifi_ui() {
         set_button_enabled(objects.btn_wifi_reconnect, can_reconnect);
     }
     if (objects.btn_wifi_start_ap) {
+        if (wifi_enabled && wifi_state == AuraNetworkManager::WIFI_STATE_AP_CONFIG) {
+            lv_obj_add_state(objects.btn_wifi_start_ap, LV_STATE_CHECKED);
+        } else {
+            lv_obj_clear_state(objects.btn_wifi_start_ap, LV_STATE_CHECKED);
+        }
         set_button_enabled(objects.btn_wifi_start_ap, wifi_enabled);
     }
     sync_wifi_toggle_state();
