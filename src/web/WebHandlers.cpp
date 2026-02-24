@@ -277,6 +277,12 @@ bool mqtt_topic_has_wildcards(const String &topic) {
     return topic.indexOf('#') >= 0 || topic.indexOf('+') >= 0;
 }
 
+void send_no_store_headers(WebServer &server) {
+    server.sendHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+    server.sendHeader("Pragma", "no-cache");
+    server.sendHeader("Expires", "0");
+}
+
 const char *dac_status_text(const FanControl &fan) {
     if (fan.isFaulted()) {
         return "FAULT";
@@ -387,6 +393,10 @@ void WebHandlersInit(WebHandlerContext *context) {
     g_deferred_mqtt_sync_due_ms = 0;
     g_deferred_restart_due_ms = 0;
     ota_reset_state();
+}
+
+bool WebHandlersIsOtaBusy() {
+    return g_ota_upload_active || g_deferred_restart;
 }
 
 void WebHandlersPollDeferred() {
@@ -553,6 +563,7 @@ void dashboard_handle_root() {
 
     // In AP mode (usually no internet), serve a CDN-free dashboard variant.
     if (ap_mode) {
+        send_no_store_headers(*context->server);
         context->server->send_P(200, "text/html", WebTemplates::kDashboardPageTemplateAp);
         return;
     }
@@ -562,6 +573,7 @@ void dashboard_handle_root() {
         return;
     }
 
+    send_no_store_headers(*context->server);
     context->server->send_P(200, "text/html", WebTemplates::kDashboardPageTemplate);
 }
 
@@ -1092,6 +1104,11 @@ void charts_handle_data() {
     if (!context || !context->server || !context->charts_history) {
         return;
     }
+    if (WebHandlersIsOtaBusy()) {
+        context->server->send(503, "application/json",
+                              "{\"success\":false,\"error\":\"OTA upload in progress\"}");
+        return;
+    }
 
     WebServer &server = *context->server;
     const ChartsHistory &history = *context->charts_history;
@@ -1171,6 +1188,11 @@ void charts_handle_data() {
 void state_handle_data() {
     WebHandlerContext *context = ctx();
     if (!context || !context->server || !context->sensor_data) {
+        return;
+    }
+    if (WebHandlersIsOtaBusy()) {
+        context->server->send(503, "application/json",
+                              "{\"success\":false,\"error\":\"OTA upload in progress\"}");
         return;
     }
 
@@ -1308,62 +1330,71 @@ void settings_handle_update() {
 
     UiController &ui = *context->ui_controller;
 
+    // Stage all inputs first to avoid partial apply on late validation errors.
+    bool has_night_mode = false;
+    bool requested_night_mode = false;
     ArduinoJson::JsonVariantConst night_mode_var = doc["night_mode"];
     if (!night_mode_var.isNull()) {
         if (!night_mode_var.is<bool>()) {
             server.send(400, "text/plain", "night_mode must be bool");
             return;
         }
-        if (!ui.webSetNightMode(night_mode_var.as<bool>())) {
+        has_night_mode = true;
+        requested_night_mode = night_mode_var.as<bool>();
+        if (ui.webNightModeLocked()) {
             server.send(409, "text/plain", "night_mode is locked by auto mode");
             return;
         }
     }
 
+    bool has_backlight = false;
+    bool requested_backlight = false;
     ArduinoJson::JsonVariantConst backlight_var = doc["backlight_on"];
     if (!backlight_var.isNull()) {
         if (!backlight_var.is<bool>()) {
             server.send(400, "text/plain", "backlight_on must be bool");
             return;
         }
-        ui.webSetBacklight(backlight_var.as<bool>());
+        has_backlight = true;
+        requested_backlight = backlight_var.as<bool>();
     }
 
+    bool has_units_c = false;
+    bool requested_units_c = false;
     ArduinoJson::JsonVariantConst units_c_var = doc["units_c"];
     if (!units_c_var.isNull()) {
         if (!units_c_var.is<bool>()) {
             server.send(400, "text/plain", "units_c must be bool");
             return;
         }
-        ui.webSetUnitsC(units_c_var.as<bool>());
+        has_units_c = true;
+        requested_units_c = units_c_var.as<bool>();
     }
 
     const ArduinoJson::JsonVariantConst temp_offset_var = doc["temp_offset"];
     const ArduinoJson::JsonVariantConst hum_offset_var = doc["hum_offset"];
     const bool has_temp_offset = !temp_offset_var.isNull();
     const bool has_hum_offset = !hum_offset_var.isNull();
-    if (has_temp_offset || has_hum_offset) {
-        float temp_offset = ui.webTempOffset();
-        float hum_offset = ui.webHumOffset();
-
-        if (has_temp_offset) {
-            if (!temp_offset_var.is<float>() && !temp_offset_var.is<int>()) {
-                server.send(400, "text/plain", "temp_offset must be number");
-                return;
-            }
-            temp_offset = temp_offset_var.as<float>();
+    const bool has_offsets = has_temp_offset || has_hum_offset;
+    float requested_temp_offset = ui.webTempOffset();
+    float requested_hum_offset = ui.webHumOffset();
+    if (has_temp_offset) {
+        if (!temp_offset_var.is<float>() && !temp_offset_var.is<int>()) {
+            server.send(400, "text/plain", "temp_offset must be number");
+            return;
         }
-        if (has_hum_offset) {
-            if (!hum_offset_var.is<float>() && !hum_offset_var.is<int>()) {
-                server.send(400, "text/plain", "hum_offset must be number");
-                return;
-            }
-            hum_offset = hum_offset_var.as<float>();
+        requested_temp_offset = temp_offset_var.as<float>();
+    }
+    if (has_hum_offset) {
+        if (!hum_offset_var.is<float>() && !hum_offset_var.is<int>()) {
+            server.send(400, "text/plain", "hum_offset must be number");
+            return;
         }
-
-        ui.webSetOffsets(temp_offset, hum_offset);
+        requested_hum_offset = hum_offset_var.as<float>();
     }
 
+    bool has_display_name = false;
+    String requested_display_name;
     ArduinoJson::JsonVariantConst display_name_var = doc["display_name"];
     if (!display_name_var.isNull()) {
         if (!display_name_var.is<const char *>()) {
@@ -1375,19 +1406,17 @@ void settings_handle_update() {
             return;
         }
 
-        String display_name = display_name_var.as<String>();
-        display_name.trim();
-        if (display_name.length() > kWebDisplayNameMaxLen) {
+        requested_display_name = display_name_var.as<String>();
+        requested_display_name.trim();
+        if (requested_display_name.length() > kWebDisplayNameMaxLen) {
             server.send(400, "text/plain", "display_name is too long");
             return;
         }
-        if (has_control_chars(display_name)) {
+        if (has_control_chars(requested_display_name)) {
             server.send(400, "text/plain", "display_name contains invalid characters");
             return;
         }
-
-        context->storage->config().web_display_name = display_name;
-        context->storage->saveConfig(true);
+        has_display_name = true;
     }
 
     bool restart_requested = false;
@@ -1398,6 +1427,26 @@ void settings_handle_update() {
             return;
         }
         restart_requested = restart_var.as<bool>();
+    }
+
+    // Apply only after full validation.
+    if (has_backlight && !ui.webSetBacklight(requested_backlight)) {
+        server.send(409, "text/plain", "backlight state could not be applied");
+        return;
+    }
+    if (has_night_mode && !ui.webSetNightMode(requested_night_mode)) {
+        server.send(409, "text/plain", "night_mode is locked by auto mode");
+        return;
+    }
+    if (has_units_c) {
+        ui.webSetUnitsC(requested_units_c);
+    }
+    if (has_offsets) {
+        ui.webSetOffsets(requested_temp_offset, requested_hum_offset);
+    }
+    if (has_display_name) {
+        context->storage->config().web_display_name = requested_display_name;
+        context->storage->saveConfig(true);
     }
 
     ArduinoJson::JsonDocument response_doc;
@@ -1428,6 +1477,10 @@ void ota_handle_upload() {
         ota_reset_state();
         g_ota_upload_seen = true;
         g_ota_upload_active = true;
+        server.client().setTimeout(Config::OTA_HTTP_CLIENT_TIMEOUT_MS);
+        if (context->wifi_stop_scan) {
+            context->wifi_stop_scan();
+        }
         ota_set_ui_screen(true);
 
         const esp_partition_t *target_partition = esp_ota_get_next_update_partition(nullptr);
@@ -1606,6 +1659,11 @@ void ota_handle_update() {
 void events_handle_data() {
     WebHandlerContext *context = ctx();
     if (!context || !context->server) {
+        return;
+    }
+    if (WebHandlersIsOtaBusy()) {
+        context->server->send(503, "application/json",
+                              "{\"success\":false,\"error\":\"OTA upload in progress\"}");
         return;
     }
 

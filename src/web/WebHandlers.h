@@ -34,6 +34,7 @@ struct WebHandlerContext {
     bool (*wifi_is_connected)() = nullptr;
     bool (*wifi_is_ap_mode)() = nullptr;
     void (*wifi_start_scan)() = nullptr;
+    void (*wifi_stop_scan)() = nullptr;
     void (*wifi_start_sta)() = nullptr;
 
     PubSubClient *mqtt_client = nullptr;
@@ -61,6 +62,7 @@ struct WebHandlerContext {
 
 void WebHandlersInit(WebHandlerContext *context);
 void WebHandlersPollDeferred();
+bool WebHandlersIsOtaBusy();
 
 bool wifi_is_ascii_printable(const String &value, size_t max_len);
 String wifi_label_safe(const String &value);

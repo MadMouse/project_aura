@@ -52,6 +52,7 @@ public:
     void connectSta();
     void startApOnDemand();
     void startScan();
+    void stopScan();
     void setMqttScreenOpen(bool open) { mqtt_ui_open_ = open; }
     void setThemeScreenOpen(bool open) { theme_ui_open_ = open; }
 

@@ -51,6 +51,12 @@ void network_wifi_start_scan() {
     }
 }
 
+void network_wifi_stop_scan() {
+    if (g_network) {
+        g_network->stopScan();
+    }
+}
+
 void network_wifi_start_sta() {
     if (g_network) {
         g_network->connectSta();
@@ -95,6 +101,7 @@ void AuraNetworkManager::begin(StorageManager &storage) {
     web_ctx_.wifi_is_connected = network_wifi_is_connected;
     web_ctx_.wifi_is_ap_mode = network_wifi_is_ap_mode;
     web_ctx_.wifi_start_scan = network_wifi_start_scan;
+    web_ctx_.wifi_stop_scan = network_wifi_stop_scan;
     web_ctx_.wifi_start_sta = network_wifi_start_sta;
     web_ctx_.mqtt_ui_open = &mqtt_ui_open_;
     web_ctx_.theme_ui_open = &theme_ui_open_;
@@ -326,6 +333,9 @@ void AuraNetworkManager::clearCredentials() {
 }
 
 void AuraNetworkManager::startScan() {
+    if (WebHandlersIsOtaBusy()) {
+        return;
+    }
     if (wifi_scan_in_progress_) {
         return;
     }
@@ -339,6 +349,15 @@ void AuraNetworkManager::startScan() {
         WiFi.scanDelete();
         wifi_scan_in_progress_ = false;
     }
+}
+
+void AuraNetworkManager::stopScan() {
+    if (!wifi_scan_in_progress_) {
+        return;
+    }
+    WiFi.scanDelete();
+    wifi_scan_in_progress_ = false;
+    wifi_scan_started_ms_ = 0;
 }
 
 void AuraNetworkManager::connectSta() {
@@ -361,6 +380,14 @@ void AuraNetworkManager::startApOnDemand() {
 }
 
 void AuraNetworkManager::poll() {
+    const bool ota_busy = WebHandlersIsOtaBusy();
+    const uint8_t server_poll_passes = ota_busy ? 3 : 1;
+    auto handle_server_client = [this, server_poll_passes]() {
+        for (uint8_t i = 0; i < server_poll_passes; ++i) {
+            server_.handleClient();
+        }
+    };
+
     if (wifi_state_ == WIFI_STATE_STA_CONNECTING) {
         wl_status_t st = WiFi.status();
         if (st == WL_CONNECTED) {
@@ -408,17 +435,21 @@ void AuraNetworkManager::poll() {
 
     if (wifi_state_ == WIFI_STATE_AP_CONFIG) {
         if (wifi_scan_in_progress_) {
-            int n = WiFi.scanComplete();
-            if (n >= 0) {
-                wifi_build_scan_items(n);
-                WiFi.scanDelete();
-                wifi_scan_in_progress_ = false;
-            } else if (n == WIFI_SCAN_FAILED) {
-                wifi_scan_options_.clear();
-                wifi_scan_in_progress_ = false;
+            if (ota_busy) {
+                stopScan();
+            } else {
+                int n = WiFi.scanComplete();
+                if (n >= 0) {
+                    wifi_build_scan_items(n);
+                    WiFi.scanDelete();
+                    wifi_scan_in_progress_ = false;
+                } else if (n == WIFI_SCAN_FAILED) {
+                    wifi_scan_options_.clear();
+                    wifi_scan_in_progress_ = false;
+                }
             }
         }
-        server_.handleClient();
+        handle_server_client();
     } else if (wifi_state_ == WIFI_STATE_STA_CONNECTED) {
         // Periodic check of actual WiFi link while connected.
         static uint32_t last_check_ms = 0;
@@ -441,7 +472,7 @@ void AuraNetworkManager::poll() {
                 wifi_ui_dirty_ = true;
             }
         }
-        server_.handleClient();
+        handle_server_client();
     }
     WebHandlersPollDeferred();
     notifyStateChangeIfNeeded();
