@@ -33,6 +33,7 @@ static lv_indev_state_t lvgl_touch_cached_state = LV_INDEV_STATE_RELEASED;
 static TouchPoint lvgl_touch_cached_point = {};
 static uint8_t lvgl_touch_error_streak = 0;
 static uint32_t lvgl_touch_last_error_ms = 0;
+static uint32_t lvgl_touch_boot_quiet_until_ms = 0;
 static uint32_t lvgl_touch_last_recover_ms = 0;
 static uint32_t lvgl_touch_recover_attempts = 0;
 static uint32_t lvgl_touch_recover_successes = 0;
@@ -48,11 +49,13 @@ static volatile uint32_t lvgl_diag_lock_fail_count = 0;
 static volatile uint32_t lvgl_diag_touch_read_error_count = 0;
 static constexpr uint32_t LVGL_TOUCH_POLL_INTERVAL_MS = 8;
 static constexpr uint32_t LVGL_TOUCH_ERROR_STREAK_WINDOW_MS = 1200;
-static constexpr uint32_t LVGL_TOUCH_ERROR_BLOCK_MS_BASE = 200;
-static constexpr uint32_t LVGL_TOUCH_ERROR_BLOCK_MS_STREAK = 800;
+static constexpr uint32_t LVGL_TOUCH_BOOT_QUIET_MS = 5000;
+static constexpr uint32_t LVGL_TOUCH_ERROR_BLOCK_MS_BASE = 400;
+static constexpr uint32_t LVGL_TOUCH_ERROR_BLOCK_MS_STREAK = 1800;
 static constexpr uint8_t LVGL_TOUCH_RECOVER_ERROR_STREAK = 3;
-static constexpr uint32_t LVGL_TOUCH_RECOVER_COOLDOWN_MS = 30000;
+static constexpr uint32_t LVGL_TOUCH_RECOVER_COOLDOWN_MS = 90000;
 static constexpr uint32_t LVGL_TOUCH_RECOVER_BLOCK_MS = 300;
+static constexpr uint32_t LVGL_TOUCH_RECOVER_PAUSE_MS = 120;
 static constexpr uint8_t LVGL_TOUCH_RECOVER_MAX_BACKOFF_SHIFT = 4;
 static constexpr uint32_t LVGL_TOUCH_RECOVER_MAX_COOLDOWN_MS = 8UL * 60UL * 1000UL;
 static constexpr uint32_t LVGL_DIAG_MAX_REASONABLE_AGE_MS = 24UL * 60UL * 60UL * 1000UL;
@@ -135,35 +138,12 @@ static bool lvgl_touch_try_soft_recover(Touch *tp, uint32_t now_ms)
         return false;
     }
 
-    const auto transformation = tp->getTransformation();
     lvgl_touch_last_recover_ms = now_ms;
     ++lvgl_touch_recover_attempts;
 
-    bool ok = tp->del();
-    if (ok) {
-        ok = tp->begin();
-    }
-    if (ok) {
-        ok = tp->swapXY(transformation.swap_xy);
-    }
-    if (ok) {
-        ok = tp->mirrorX(transformation.mirror_x);
-    }
-    if (ok) {
-        ok = tp->mirrorY(transformation.mirror_y);
-    }
-    if (!ok) {
-        lvgl_touch_offline = true;
-        if (lvgl_touch_recover_fail_streak < 0xFF) {
-            ++lvgl_touch_recover_fail_streak;
-        }
-        ESP_LOGW("LVGL",
-                 "touch soft recovery failed (attempt=%lu, fail_streak=%u, next_retry_in=%lu ms)",
-                 static_cast<unsigned long>(lvgl_touch_recover_attempts),
-                 static_cast<unsigned>(lvgl_touch_recover_fail_streak),
-                 static_cast<unsigned long>(lvgl_touch_recover_cooldown_ms()));
-        return false;
-    }
+    // Conservative recovery: avoid full touch re-init in read loop
+    // (it can race GPIO ISR install and destabilize shared I2C devices).
+    vTaskDelay(pdMS_TO_TICKS(LVGL_TOUCH_RECOVER_PAUSE_MS));
 
     tp->resetPoints();
     ++lvgl_touch_recover_successes;
@@ -173,9 +153,10 @@ static bool lvgl_touch_try_soft_recover(Touch *tp, uint32_t now_ms)
     lvgl_touch_wait_release_after_block = true;
     lvgl_touch_read_block_until_ms = now_ms + LVGL_TOUCH_RECOVER_BLOCK_MS;
     ESP_LOGI("LVGL",
-             "touch soft recovery ok (attempt=%lu, success=%lu)",
+             "touch soft recovery applied (attempt=%lu, success=%lu, pause=%lu ms)",
              static_cast<unsigned long>(lvgl_touch_recover_attempts),
-             static_cast<unsigned long>(lvgl_touch_recover_successes));
+             static_cast<unsigned long>(lvgl_touch_recover_successes),
+             static_cast<unsigned long>(LVGL_TOUCH_RECOVER_PAUSE_MS));
     return true;
 }
 
@@ -888,6 +869,13 @@ static void touchpad_read(lv_indev_drv_t *indev_drv, lv_indev_data_t *data)
         return;
     }
 
+    if ((lvgl_touch_boot_quiet_until_ms != 0) &&
+        is_before_deadline(now_ms, lvgl_touch_boot_quiet_until_ms)) {
+        lvgl_touch_cached_state = LV_INDEV_STATE_RELEASED;
+        data->state = lvgl_touch_cached_state;
+        return;
+    }
+
     if (lvgl_touch_offline) {
         const bool cooldown_active =
             (lvgl_touch_last_recover_ms != 0) &&
@@ -1068,6 +1056,8 @@ bool lvgl_port_init(LCD *lcd, Touch *tp)
     lvgl_touch_recover_successes = 0;
     lvgl_touch_recover_fail_streak = 0;
     lvgl_touch_offline = false;
+    lvgl_touch_boot_quiet_until_ms = get_monotonic_ms() + LVGL_TOUCH_BOOT_QUIET_MS;
+    lvgl_touch_read_block_until_ms = lvgl_touch_boot_quiet_until_ms;
 
     auto bus_type = lcd->getBus()->getBasicAttributes().type;
 #if LVGL_PORT_AVOID_TEAR
