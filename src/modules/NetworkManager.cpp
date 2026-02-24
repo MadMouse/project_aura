@@ -76,6 +76,7 @@ bool network_wifi_is_ap_mode() {
 void AuraNetworkManager::begin(StorageManager &storage) {
     storage_ = &storage;
     g_network = this;
+    mdns_started_ = false;
     WiFi.persistent(false);
     hostname_ = build_wifi_hostname();
     if (hostname_.isEmpty()) {
@@ -132,6 +133,7 @@ void AuraNetworkManager::begin(StorageManager &storage) {
         }
     } else {
         warmupIfDisabled();
+        stopMdns();
         WiFi.persistent(false);
         WiFi.disconnect();
         WiFi.mode(WIFI_OFF);
@@ -269,6 +271,7 @@ bool AuraNetworkManager::setEnabled(bool enabled) {
             startAp();
         }
     } else {
+        stopMdns();
         stopAp();
         WiFi.scanDelete();
         WiFi.disconnect(true);
@@ -297,6 +300,7 @@ bool AuraNetworkManager::applyEnabledIfDirty() {
             startAp();
         }
     } else {
+        stopMdns();
         stopAp();
         WiFi.scanDelete();
         WiFi.disconnect(true);
@@ -320,6 +324,7 @@ void AuraNetworkManager::clearCredentials() {
     wifi_connect_start_ms_ = 0;
     wifi_scan_options_.clear();
     wifi_scan_in_progress_ = false;
+    stopMdns();
     stopAp();
     WiFi.scanDelete();
     WiFi.disconnect(true, true);
@@ -395,14 +400,7 @@ void AuraNetworkManager::poll() {
             wifi_retry_count_ = 0;
             wifi_retry_at_ms_ = 0;
             wifi_ui_dirty_ = true;
-            if (MDNS.begin(hostname_.c_str())) {
-                Logger::log(Logger::Info, "mDNS",
-                            "responder started: %s.local",
-                            hostname_.c_str());
-                MDNS.addService("http", "tcp", 80);
-            } else {
-                LOGW("mDNS", "start failed");
-            }
+            startMdns();
             server_.begin();
             Logger::log(Logger::Info, "WiFi",
                         "connected, IP: %s",
@@ -464,7 +462,7 @@ void AuraNetworkManager::poll() {
                             static_cast<int>(st),
                             static_cast<unsigned>((now - wifi_connect_start_ms_) / 1000),
                             rssi_text);
-                MDNS.end();
+                stopMdns();
                 server_.stop();
                 wifi_state_ = WIFI_STATE_OFF;
                 wifi_retry_at_ms_ = now + Config::WIFI_CONNECT_RETRY_DELAY_MS;
@@ -472,7 +470,9 @@ void AuraNetworkManager::poll() {
                 wifi_ui_dirty_ = true;
             }
         }
-        handle_server_client();
+        if (wifi_state_ == WIFI_STATE_STA_CONNECTED) {
+            handle_server_client();
+        }
     }
     WebHandlersPollDeferred();
     notifyStateChangeIfNeeded();
@@ -510,6 +510,7 @@ void AuraNetworkManager::startSta() {
         return;
     }
 
+    stopMdns();
     stopAp();
     WiFi.persistent(false);
     const bool force_reset = (wifi_retry_count_ > 0);
@@ -549,6 +550,7 @@ void AuraNetworkManager::startSta() {
 }
 
 void AuraNetworkManager::startAp() {
+    stopMdns();
     WiFi.persistent(false);
     WiFi.mode(WIFI_AP_STA);
     const char *ap_ssid = ap_ssid_.isEmpty() ? Config::WIFI_AP_SSID : ap_ssid_.c_str();
@@ -572,4 +574,27 @@ void AuraNetworkManager::stopAp() {
         WiFi.enableAP(false);
     }
     wifi_ui_dirty_ = true;
+}
+
+void AuraNetworkManager::startMdns() {
+    if (mdns_started_) {
+        return;
+    }
+    if (MDNS.begin(hostname_.c_str())) {
+        Logger::log(Logger::Info, "mDNS",
+                    "responder started: %s.local",
+                    hostname_.c_str());
+        MDNS.addService("http", "tcp", 80);
+        mdns_started_ = true;
+    } else {
+        LOGW("mDNS", "start failed");
+    }
+}
+
+void AuraNetworkManager::stopMdns() {
+    if (!mdns_started_) {
+        return;
+    }
+    MDNS.end();
+    mdns_started_ = false;
 }

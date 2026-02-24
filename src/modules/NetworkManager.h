@@ -78,6 +78,8 @@ private:
     void startSta();
     void startAp();
     void stopAp();
+    void startMdns();
+    void stopMdns();
     void notifyStateChangeIfNeeded();
 
     StorageManager *storage_ = nullptr;
@@ -102,6 +104,7 @@ private:
     bool mqtt_ui_open_ = false;
     bool theme_ui_open_ = false;
     bool server_routes_registered_ = false;
+    bool mdns_started_ = false;
     StateChangeCallback state_change_cb_ = nullptr;
     void *state_change_ctx_ = nullptr;
 };

@@ -90,6 +90,19 @@ WebHandlerContext *ctx() {
     return g_ctx;
 }
 
+bool persist_dac_auto_mode(StorageManager &storage, bool enabled) {
+    const bool previous = storage.config().dac_auto_mode;
+    if (previous == enabled) {
+        return true;
+    }
+    storage.config().dac_auto_mode = enabled;
+    if (!storage.saveConfig(true)) {
+        storage.config().dac_auto_mode = previous;
+        return false;
+    }
+    return true;
+}
+
 uint16_t chart_window_points(const String &window_arg, const char *&window_name) {
     String window = window_arg;
     window.trim();
@@ -1066,18 +1079,20 @@ void dac_handle_action() {
     const String action = String(doc["action"] | "");
     if (action == "set_mode") {
         const String mode = String(doc["mode"] | "");
+        bool auto_mode = false;
         if (mode == "manual") {
-            fan.setMode(FanControl::Mode::Manual);
-            context->storage->config().dac_auto_mode = false;
-            context->storage->saveConfig(true);
+            auto_mode = false;
         } else if (mode == "auto") {
-            fan.setMode(FanControl::Mode::Auto);
-            context->storage->config().dac_auto_mode = true;
-            context->storage->saveConfig(true);
+            auto_mode = true;
         } else {
             server.send(400, "text/plain", "Invalid mode");
             return;
         }
+        if (!persist_dac_auto_mode(*context->storage, auto_mode)) {
+            server.send(500, "text/plain", "Failed to persist DAC mode");
+            return;
+        }
+        fan.setMode(auto_mode ? FanControl::Mode::Auto : FanControl::Mode::Manual);
     } else if (action == "set_manual_step") {
         fan.setManualStep(doc["step"] | 1);
     } else if (action == "set_timer") {
@@ -1087,9 +1102,11 @@ void dac_handle_action() {
     } else if (action == "stop") {
         fan.requestStop();
     } else if (action == "start_auto") {
+        if (!persist_dac_auto_mode(*context->storage, true)) {
+            server.send(500, "text/plain", "Failed to persist DAC auto mode");
+            return;
+        }
         fan.requestAutoStart();
-        context->storage->config().dac_auto_mode = true;
-        context->storage->saveConfig(true);
     } else {
         server.send(400, "text/plain", "Unsupported action");
         return;
@@ -1131,18 +1148,19 @@ void dac_handle_auto() {
     }
 
     const bool rearm = root["rearm"] | false;
-    fan.setAutoConfig(config);
     String serialized = DacAutoConfigJson::serialize(config);
     if (!context->storage->saveTextAtomic(StorageManager::kDacAutoPath, serialized)) {
         server.send(500, "text/plain", "Failed to persist auto config");
         return;
     }
+    if (rearm && !persist_dac_auto_mode(*context->storage, true)) {
+        server.send(500, "text/plain", "Failed to persist DAC auto mode");
+        return;
+    }
+
+    fan.setAutoConfig(config);
     if (rearm) {
         fan.requestAutoStart();
-        if (!context->storage->config().dac_auto_mode) {
-            context->storage->config().dac_auto_mode = true;
-            context->storage->saveConfig(true);
-        }
     }
     server.send(200, "application/json", "{\"success\":true}");
 }
