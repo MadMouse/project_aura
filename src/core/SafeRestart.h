@@ -6,7 +6,6 @@
 
 #pragma once
 
-// Restart the system with Core 0 as the restart initiator via IPC call.
-// This reduces dual-core restart races around cache disable.
-void safe_restart_via_core0();
-
+// Restart the system with Core 0 as the initiator without using IPC task stack.
+// Does not return.
+[[noreturn]] void safe_restart_via_core0();
