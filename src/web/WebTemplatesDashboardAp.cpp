@@ -713,7 +713,9 @@ function renderHeroMetric(sensors, historyRows) {
   const firstCo2 = validPts.length ? validPts[0].co2 : null;
   const delta3h = (isNum(v) && isNum(firstCo2)) ? v - firstCo2 : null;
   const deltaColor = !isNum(delta3h) ? '#9ca3af' : delta3h > 20 ? '#fdba74' : delta3h < -20 ? '#a5f3fc' : '#d1d5db';
-  const progressW = v !== null ? Math.min((v / thresholds.co2.bad) * 100, 100) : 0;
+  const progressW = v !== null
+    ? Math.min(100, Math.max(0, ((v - 400) / (2000 - 400)) * 100))
+    : 0;
 
   const miniSvg = co2Data.length >= 2 ? buildMiniChartSvg(co2Data, 'co2', color) : '';
 

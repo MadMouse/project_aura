@@ -835,7 +835,9 @@ const HeroMetric = ({ value, status, history = [] }) => {
       : delta3h < -20
         ? 'text-cyan-300'
         : 'text-gray-300';
-  const progressWidth = isFiniteNumber(safeValue) ? Math.min((safeValue / thresholds.co2.bad) * 100, 100) : 0;
+  const progressWidth = isFiniteNumber(safeValue)
+    ? Math.min(100, Math.max(0, ((safeValue - 400) / (2000 - 400)) * 100))
+    : 0;
 
   return (
     <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-5 md:p-7 border border-gray-700/60 shadow-xl h-full flex flex-col">
