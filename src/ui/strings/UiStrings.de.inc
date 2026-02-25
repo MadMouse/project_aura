@@ -37,7 +37,7 @@
     "http://aura.local/mqtt",
     "http://aura.local/theme",
     "CO erkannt - Für Belüftung sorgen",
-    "CO erhoeht - Sofort lüften",
+    "CO erhöht - Sofort lüften",
     "CO Gefahr! Jetzt evakuieren",
     "CO2 Sehr hoch! Jetzt lüften",
     "CO2 Hoch - Bald lüften",
