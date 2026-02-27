@@ -737,6 +737,16 @@ uint8_t FanControl::evaluateAutoDemandPercent(const SensorData &data, bool gas_w
                                              Config::AQ_PM10_YELLOW_MAX_UGM3,
                                              Config::AQ_PM10_ORANGE_MAX_UGM3));
 
+    const bool hcho_valid = data.hcho_valid &&
+                            isfinite(data.hcho) &&
+                            data.hcho >= 0.0f;
+    demand = maxPercent(demand, pick_percent(auto_config_.hcho,
+                                             hcho_valid,
+                                             data.hcho,
+                                             Config::AQ_HCHO_GREEN_MAX_PPB,
+                                             Config::AQ_HCHO_YELLOW_MAX_PPB,
+                                             Config::AQ_HCHO_ORANGE_MAX_PPB));
+
     const bool voc_valid = !gas_warmup &&
                            data.voc_valid &&
                            data.voc_index >= 0;

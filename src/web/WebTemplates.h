@@ -1754,6 +1754,7 @@ static const char kDacPageTemplate[] PROGMEM = R"HTML(
       pm4:  {name:"PM4.0",unit:"&micro;g/m&sup3;",field:"pm4",valid:"pm4_valid",decimals:1,labels:["<=25",">25-50",">50-75",">75"],defaults:[20,40,70,100]},
       pm25: {name:"PM2.5",unit:"&micro;g/m&sup3;",field:"pm25",valid:"pm25_valid",decimals:1,labels:["<=12",">12-35",">35-55",">55"],defaults:[20,40,70,100]},
       pm10: {name:"PM10",unit:"&micro;g/m&sup3;",field:"pm10",valid:"pm10_valid",decimals:1,labels:["<=54",">54-154",">154-254",">254"],defaults:[20,40,70,100]},
+      hcho: {name:"HCHO",unit:"ppb",field:"hcho",valid:"hcho_valid",decimals:1,labels:["<30","30-60","60-100",">100"],defaults:[20,40,70,100]},
       voc:  {name:"VOC Index",unit:"",field:"voc_index",valid:"voc_valid",decimals:0,labels:["<150","151-250","251-350",">350"],defaults:[20,50,80,100]},
       nox:  {name:"NOx Index",unit:"",field:"nox_index",valid:"nox_valid",decimals:0,labels:["<50","50-99","100-199",">=200"],defaults:[20,40,70,100]},
     };

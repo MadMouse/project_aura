@@ -62,6 +62,7 @@ void sanitize(DacAutoConfig &cfg) {
     sanitize_sensor(cfg.pm4);
     sanitize_sensor(cfg.pm25);
     sanitize_sensor(cfg.pm10);
+    sanitize_sensor(cfg.hcho);
     sanitize_sensor(cfg.voc);
     sanitize_sensor(cfg.nox);
 }
@@ -78,6 +79,7 @@ void writeJson(ArduinoJson::JsonObject root, const DacAutoConfig &cfg) {
     write_sensor(root["pm4"].to<ArduinoJson::JsonObject>(), sanitized.pm4);
     write_sensor(root["pm25"].to<ArduinoJson::JsonObject>(), sanitized.pm25);
     write_sensor(root["pm10"].to<ArduinoJson::JsonObject>(), sanitized.pm10);
+    write_sensor(root["hcho"].to<ArduinoJson::JsonObject>(), sanitized.hcho);
     write_sensor(root["voc"].to<ArduinoJson::JsonObject>(), sanitized.voc);
     write_sensor(root["nox"].to<ArduinoJson::JsonObject>(), sanitized.nox);
 }
@@ -96,6 +98,7 @@ bool readJson(ArduinoJson::JsonObjectConst source, DacAutoConfig &cfg) {
     read_sensor(source["pm4"].as<ArduinoJson::JsonObjectConst>(), parsed.pm4);
     read_sensor(source["pm25"].as<ArduinoJson::JsonObjectConst>(), parsed.pm25);
     read_sensor(source["pm10"].as<ArduinoJson::JsonObjectConst>(), parsed.pm10);
+    read_sensor(source["hcho"].as<ArduinoJson::JsonObjectConst>(), parsed.hcho);
     read_sensor(source["voc"].as<ArduinoJson::JsonObjectConst>(), parsed.voc);
     read_sensor(source["nox"].as<ArduinoJson::JsonObjectConst>(), parsed.nox);
 
