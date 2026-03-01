@@ -4215,13 +4215,13 @@ void create_screen_page_theme() {
                                             // label_btn_theme_mars_pathfinder
                                             lv_obj_t *obj = lv_label_create(parent_obj);
                                             objects.label_btn_theme_mars_pathfinder = obj;
-                                            lv_obj_set_pos(obj, 30, 9);
-                                            lv_obj_set_size(obj, 66, LV_SIZE_CONTENT);
+                                            lv_obj_set_pos(obj, 8, 9);
+                                            lv_obj_set_size(obj, 112, LV_SIZE_CONTENT);
                                             lv_obj_clear_flag(obj, LV_OBJ_FLAG_CLICK_FOCUSABLE|LV_OBJ_FLAG_GESTURE_BUBBLE|LV_OBJ_FLAG_PRESS_LOCK|LV_OBJ_FLAG_SCROLLABLE|LV_OBJ_FLAG_SCROLL_CHAIN_HOR|LV_OBJ_FLAG_SCROLL_CHAIN_VER|LV_OBJ_FLAG_SCROLL_ELASTIC|LV_OBJ_FLAG_SCROLL_MOMENTUM|LV_OBJ_FLAG_SCROLL_WITH_ARROW|LV_OBJ_FLAG_SNAPPABLE);
                                             lv_obj_set_style_text_color(obj, lv_color_hex(0xffc4bf7c), LV_PART_MAIN | LV_STATE_DEFAULT);
                                             lv_obj_set_style_text_font(obj, &ui_font_jet_reg_18, LV_PART_MAIN | LV_STATE_DEFAULT);
                                             lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
-                                            lv_label_set_text(obj, "Golden\nHour");
+                                            lv_label_set_text(obj, "Heavy\nDuty");
                                         }
                                     }
                                 }
