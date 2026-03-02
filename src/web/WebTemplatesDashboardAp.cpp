@@ -14,7 +14,7 @@ const char kDashboardPageTemplateAp[] PROGMEM = R"HTML_DASH_AP(
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Aura Dashboard (AP Offline)</title>
+  <title>Aura Dashboard</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAxNjkzLjMyIDE2OTMuMzInPjxwYXRoIGZpbGw9JyNFNkI4NzMnIGZpbGwtcnVsZT0nZXZlbm9kZCcgY2xpcC1ydWxlPSdldmVub2RkJyBkPSdNODQ2LjY2IDE2NDIuNTNjNDM5LjU1LDAgNzk1Ljg3LC0zNTYuMzIgNzk1Ljg3LC03OTUuODcgMCwtNDM5LjU1IC0zNTYuMzIsLTc5NS44NyAtNzk1Ljg3LC03OTUuODcgLTQzOS41NSwwIC03OTUuODcsMzU2LjMyIC03OTUuODcsNzk1Ljg3IDAsNDM5LjU1IDM1Ni4zMiw3OTUuODcgNzk1Ljg3LDc5NS44N3ptLTQxOS4zMiAtMTM3MC4yOGMzMjcuMTcsLTYwLjE4IDY3NS4xNCwxNTAuNDQgNjkwLjYzLDUxMi44IDU2LjE2LC0xODAuOSAtMTEuMTksLTM3My44MiAtMTQzLjQxLC01MDMuNTIgLTY2LjY4LC02NS40IC0xNDkuNjgsLTExNC4zNiAtMjQxLjE0LC0xMzcuMDcgLTExMy4xNywxOC4xMSAtMjE3LjQsNjIuOTQgLTMwNi4wOCwxMjcuNzl6bTU4Ny44NyAzNTMuMjZjLTcyLjgsLTE3NC42NCAtMjQ5LjE4LC0yNzkuNTUgLTQzMy42OCwtMjkzLjkxIC05My4xNiwtNy4yNSAtMTg4LjA3LDguNDQgLTI3Mi40OCw0OS41NCAtNzIuNSw4My42NSAtMTI1LjgsMTg0LjM3IC0xNTMuMDUsMjk1LjM2IDIxMi4wOCwtMjU2LjcxIDYxNC4yOSwtMzE5LjMzIDg1OS4yMSwtNTAuOTl6bS0xMjAuNiAtNDg4LjQ1YzEyOC42OCw3My4xOCAyMzAuMDQsMTk0IDI3OSwzMzMuMjQgNjAuODgsMTczLjE0IDM1LjAyLDM1NC44MiAtNzkuNjgsNTAzLjcxIDE1OS4xNywtMTAyLjIzIDIzMS44NiwtMjkzLjk1IDIxMy45OCwtNDc4LjEgLTkuMDIsLTkyLjkgLTQxLjEsLTE4My43IC05Ni41MSwtMjU5Ljg3IC05My43NSwtNTYuMTQgLTIwMS41MSwtOTEuMyAtMzE2Ljc5LC05OC45OHptNDQ0LjkzIDE5Ni45N2MxMTUuODMsMzEyLjA3IC0zMC44NCw2OTEuMzEgLTM4NS41NSw3NjkuMTUgMTg3LjU3LDI0LjE0IDM2Ni43MSwtNzYuMDkgNDcxLjM0LC0yMjguNjEgNTIuOTQsLTc3LjE3IDg2LjgsLTE2Ny40NSA5My4yOCwtMjYxLjM1IC0zNy4xNiwtMTA2Ljk4IC05OS4xNiwtMjAyLjMyIC0xNzkuMDcsLTI3OS4xOXptMjE0LjI3IDQzNi41N2MtMTExLjU0LDMxMy41MiAtNDY3LjgzLDUwOS43MiAtNzg5LjQ0LDM0MS44MSAxMjguMjQsMTM4Ljc3IDMyOS44MiwxNzcuMSA1MDcuNzcsMTI3LjU5IDkwLjAzLC0yNS4wNSAxNzQuMDEsLTcyLjUzIDIzOS40NCwtMTQwLjUxIDI5LjksLTc4LjU1IDQ2LjI4LC0xNjMuNzggNDYuMjgsLTI1Mi44MyAwLC0yNS43IC0xLjM5LC01MS4wNyAtNC4wNSwtNzYuMDZ6bS0xMTYuNTcgNDcyLjM4Yy0yODcuMTIsMTY4LjIzIC02ODYuMjIsODkuOTYgLTgyNC41NCwtMjQ1Ljk4IDguNzEsMTg5LjA4IDEzOC40NSwzNDcuNzUgMzA2LjkzLDQyNC4zNiA4NS4xMywzOC43MSAxNzkuODQsNTYuMzggMjczLjQzLDQ2LjUzIDk4LjAzLC01NC43OCAxODEuNzUsLTEzMi4wOSAyNDQuMTgsLTIyNC45MXptLTM5Mi42NSAyODYuOTRjLTMyOC4xLC01NS4yOCAtNTgzLjU4LC0zNzIuMzUgLTQ3My44NywtNzE4LjM5IC0xMTQuNzgsMTUwLjY2IC0xMTcuNCwzNTUuNDIgLTM3LjU5LDUyMi40IDQwLjMxLDg0LjMzIDEwMS41NCwxNTguNzUgMTc5LjY4LDIxMS4zNCA0My4zNSw4LjI2IDg4LjEsMTIuNTkgMTMzLjg1LDEyLjU5IDY4LjY5LDAgMTM1LjEsLTkuNzcgMTk3LjkzLC0yNy45NHptLTQ4NS4zOCAtMzIuNTdjLTIxNS44MSwtMjUzLjM0IC0yMDgsLTY2MC4yOSA5OC42NCwtODU0Ljg4IC0xODQuNjksNDEuNjUgLTMxOC40MywxOTYuNzIgLTM2NC41OCwzNzUuODUgLTIzLjI5LDkwLjQgLTI0LjIsMTg2LjczIDEuODQsMjc3LjMyIDcwLjQ1LDg2LjQ0IDE2MC44MSwxNTYuMDEgMjY0LjEsMjAxLjcxem0tMzUxLjA0IC0zMzcuMTZjLTIuMTgsLTMzMy4wNiAyNjUuMzYsLTYzOS43MSA2MjUuNDgsLTU5MS4yNiAtMTY4LjE0LC04Ny4wMyAtMzcwLjYyLC01NC4wNCAtNTIxLjM0LDUzLjY2IC01OS43Miw0Mi42OCAtMTc2Ljg1LDE2NS4xNiAtMTc2Ljg1LDIyNC4wNyAwLDExMi41MyAyNi4xOCwyMTguOTQgNzIuNzEsMzEzLjUzem02MzguNDkgLTEyMy4yM2MxMDUuMSwwIDE5MC4zLC04NS4yIDE5MC4zLC0xOTAuMyAwLC0xMDUuMSAtODUuMiwtMTkwLjMgLTE5MC4zLC0xOTAuMyAtMTA1LjEsMCAtMTkwLjMsODUuMiAtMTkwLjMsMTkwLjMgMCwxMDUuMSA4NS4yLDE5MC4zIDE5MC4zLDE5MC4zeicvPjwvc3ZnPg==" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -55,6 +55,26 @@ const char kDashboardPageTemplateAp[] PROGMEM = R"HTML_DASH_AP(
     .btn-amber { background: #1c1100; border-color: #78350f; color: #fcd34d; }
     .btn-amber:hover { border-color: #d97706; }
     .link-btn { text-decoration: none; display: inline-flex; align-items: center; }
+    .net-status {
+      margin: -4px 0 12px;
+      padding: 9px 12px;
+      border-radius: 10px;
+      border: 1px solid #374151;
+      background: rgba(31, 41, 55, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .net-status-text { font-size: 12px; font-weight: 700; letter-spacing: 0.01em; }
+    .net-status-meta { font-size: 11px; color: #9ca3af; }
+    .net-status.ok { border-color: rgba(34,197,94,.45); background: rgba(20,83,45,.35); }
+    .net-status.ok .net-status-text { color: #86efac; }
+    .net-status.warn { border-color: rgba(245,158,11,.45); background: rgba(120,53,15,.28); }
+    .net-status.warn .net-status-text { color: #fcd34d; }
+    .net-status.err { border-color: rgba(239,68,68,.45); background: rgba(127,29,29,.32); }
+    .net-status.err .net-status-text { color: #fca5a5; }
 
     /* ── Tab nav ── */
     .tab-nav { display: flex; flex-wrap: wrap; background: #1f2937; padding: 4px; border-radius: 12px; margin-bottom: 16px; border: 1px solid rgba(55,65,81,.5); gap: 4px; }
@@ -165,22 +185,54 @@ const char kDashboardPageTemplateAp[] PROGMEM = R"HTML_DASH_AP(
     .chart-svg-wrap { position: relative; height: 140px; width: 100%; }
     .chart-svg-wrap svg { width: 100%; height: 100%; display: block; overflow: visible; }
     .chart-point { fill: transparent; stroke: transparent; pointer-events: none; }
+    .chart-vline {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 1px;
+      border-left: 1px dashed rgba(148, 163, 184, 0.55);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .12s;
+    }
+    .chart-vline.show { opacity: 1; }
+    .chart-focus {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      border: 2px solid #22c55e;
+      background: #031226;
+      box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.28);
+      transform: translate(-50%, -50%);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .12s;
+    }
+    .chart-focus.show { opacity: 1; }
     .chart-tooltip {
       position: absolute;
-      z-index: 5;
+      z-index: 6;
       pointer-events: none;
-      background: rgba(3, 7, 18, 0.96);
-      border: 1px solid #4b5563;
-      border-radius: 8px;
+      background: rgba(2, 10, 30, 0.96);
+      border: 1px solid rgba(71, 85, 105, 0.72);
+      box-shadow: 0 10px 24px rgba(2, 6, 23, 0.48);
+      border-radius: 14px;
       color: #f9fafb;
-      font-size: 11px;
-      line-height: 1.3;
-      padding: 6px 8px;
-      white-space: pre-line;
-      transform: translate(-50%, -100%);
+      font-size: 12px;
+      line-height: 1.35;
+      padding: 10px 12px;
+      min-width: 170px;
+      max-width: 260px;
+      transform: translate(-50%, 0);
       display: none;
     }
     .chart-tooltip.show { display: block; }
+    .chart-tooltip-time { color: #94a3b8; font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+    .chart-tooltip-rows { display: flex; flex-direction: column; gap: 4px; }
+    .chart-tooltip-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+    .chart-tooltip-name { font-size: 12px; font-weight: 700; }
+    .chart-tooltip-value { color: #f8fafc; font-size: 12px; font-weight: 700; white-space: nowrap; }
     .chart-minmax { display: flex; justify-content: space-between; margin-top: 6px; font-size: 11px; color: #6b7280; }
     .no-data { color: #6b7280; font-size: 13px; padding: 24px 0; text-align: center; }
 
@@ -232,6 +284,8 @@ const char kDashboardPageTemplateAp[] PROGMEM = R"HTML_DASH_AP(
     .settings-grid { display: grid; grid-template-columns: 1fr; gap: 12px; align-items: start; }
     .settings-col { display: flex; flex-direction: column; gap: 12px; }
     .settings-col .sg + .sg { margin-top: 0; }
+    .conn-rows { display: flex; flex-direction: column; gap: 0; }
+    .conn-rows .info-row:last-child { border-bottom: none; }
     @media (min-width: 1024px) { .settings-grid { grid-template-columns: 1fr 1fr; } }
 
     /* ── System tab ── */
@@ -251,7 +305,21 @@ const char kDashboardPageTemplateAp[] PROGMEM = R"HTML_DASH_AP(
     .progress-fill { height: 100%; background: linear-gradient(90deg, #0891b2, #67e8f9); border-radius: 999px; width: 0%; transition: width .25s; }
     .ota-status { font-size: 12px; color: #9ca3af; margin-top: 6px; }
     .ota-status.ok { color: #4ade80; }
+    .ota-status.warn { color: #fcd34d; }
     .ota-status.err { color: #f87171; }
+    .ota-precheck {
+      margin-bottom: 4px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid #374151;
+      background: rgba(31, 41, 55, 0.6);
+      color: #9ca3af;
+      font-size: 12px;
+      line-height: 1.35;
+    }
+    .ota-precheck.ok { border-color: rgba(34,197,94,.45); color: #86efac; background: rgba(20,83,45,.28); }
+    .ota-precheck.warn { border-color: rgba(245,158,11,.45); color: #fcd34d; background: rgba(120,53,15,.24); }
+    .ota-precheck.err { border-color: rgba(239,68,68,.45); color: #fca5a5; background: rgba(127,29,29,.28); }
 
     /* ── Misc ── */
     .muted { color: #6b7280; }
@@ -276,6 +344,10 @@ const char kDashboardPageTemplateAp[] PROGMEM = R"HTML_DASH_AP(
         <div id="headerDate" class="clock-date">-- --- ----</div>
       </div>
     </div>
+  </div>
+  <div id="netStatusBar" class="net-status warn">
+    <span id="netStatusText" class="net-status-text">Connecting to device...</span>
+    <span id="netStatusMeta" class="net-status-meta">No live state yet.</span>
   </div>
 
   <!-- Tab nav -->
@@ -371,6 +443,19 @@ const char kDashboardPageTemplateAp[] PROGMEM = R"HTML_DASH_AP(
       </div>
       <div class="settings-col">
         <div class="sg">
+          <div class="sg-title">Connectivity</div>
+          <div class="conn-rows">
+            <div class="info-row"><span class="info-key">Mode</span><span class="info-val" id="cfg-mode">--</span></div>
+            <div class="info-row"><span class="info-key">WiFi SSID</span><span class="info-val" id="cfg-ssid">--</span></div>
+            <div class="info-row"><span class="info-key">Hostname</span><span class="info-val" id="cfg-hostname">--</span></div>
+            <div class="info-row"><span class="info-key">IP Address</span><span class="info-val" id="cfg-ip">--</span></div>
+            <div class="info-row"><span class="info-key">Signal</span><span class="info-val" id="cfg-rssi">--</span></div>
+            <div class="info-row"><span class="info-key">MQTT Broker</span><span class="info-val" id="cfg-mqtt-broker">--</span></div>
+            <div class="info-row"><span class="info-key">MQTT Status</span><span class="info-val" id="cfg-mqtt-status">--</span></div>
+            <div class="info-row"><span class="info-key">Last Sync</span><span class="info-val" id="cfg-last-sync">--</span></div>
+          </div>
+        </div>
+        <div class="sg">
           <div class="sg-title">Measurements</div>
           <div class="sg-rows">
             <div class="seg-row">
@@ -420,12 +505,13 @@ const char kDashboardPageTemplateAp[] PROGMEM = R"HTML_DASH_AP(
         <div class="sys-btn-row">
           <button class="btn btn-danger" type="button" id="rebootBtn">Reboot Device</button>
           <button class="btn" type="button" id="openDacBtn" disabled>Open DAC Page</button>
-          <a class="btn link-btn" href="/">WiFi Setup</a>
+          <a class="btn link-btn" href="/dashboard" id="networkActionBtn">Open Dashboard</a>
         </div>
       </div>
       <div class="sg">
         <div class="sg-title">Firmware OTA</div>
         <div class="sg-rows">
+          <div id="otaPrecheck" class="ota-precheck warn">Waiting for device state before OTA.</div>
           <div class="text-field-row">
             <label class="text-field-lbl" for="otaFile">Firmware file (.bin)</label>
             <input type="file" id="otaFile" accept=".bin,application/octet-stream" style="color:#d1d5db;" />
@@ -680,8 +766,7 @@ function buildChartSvg(data, keys, colors, height, options) {
       pts.forEach(p => {
         if (!isNum(p.v) || !isNum(p.y)) return;
         const valueText = Number(p.v).toFixed(digits);
-        const tooltipText = `${name} ${p.t}: ${valueText}${unit ? ' ' + unit : ''}`;
-        pointsHtml += `<circle class="chart-point" data-tip="${esc(tooltipText)}" data-x="${p.x.toFixed(2)}" data-y="${p.y.toFixed(2)}" cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="3.0" fill="transparent" stroke="transparent" stroke-width="0"></circle>`;
+        pointsHtml += `<circle class="chart-point" data-name="${esc(name)}" data-time="${esc(p.t)}" data-value="${esc(valueText)}" data-unit="${esc(unit)}" data-color="${esc(c)}" data-x="${p.x.toFixed(2)}" data-y="${p.y.toFixed(2)}" cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="3.0" fill="transparent" stroke="transparent" stroke-width="0"></circle>`;
       });
     }
   });
@@ -990,7 +1075,9 @@ function bindChartPointTooltips(root) {
   if (!root) return;
   root.querySelectorAll('.chart-svg-wrap').forEach(wrap => {
     const tooltip = wrap.querySelector('.chart-tooltip');
-    if (!tooltip) return;
+    const vline = wrap.querySelector('.chart-vline');
+    const focus = wrap.querySelector('.chart-focus');
+    if (!tooltip || !vline || !focus) return;
     const pointEls = Array.from(wrap.querySelectorAll('.chart-point'));
     if (!pointEls.length) return;
 
@@ -998,18 +1085,24 @@ function bindChartPointTooltips(root) {
     pointEls.forEach(point => {
       const x = Number(point.getAttribute('data-x'));
       const y = Number(point.getAttribute('data-y'));
-      const tip = point.getAttribute('data-tip') || '';
-      if (!Number.isFinite(x) || !Number.isFinite(y) || !tip) return;
+      const name = point.getAttribute('data-name') || '';
+      const time = point.getAttribute('data-time') || '--:--';
+      const value = point.getAttribute('data-value') || '';
+      const unit = point.getAttribute('data-unit') || '';
+      const color = point.getAttribute('data-color') || '#22c55e';
+      if (!Number.isFinite(x) || !Number.isFinite(y) || !value) return;
       const key = x.toFixed(2);
       if (!groups.has(key)) groups.set(key, []);
-      groups.get(key).push({ x, y, tip });
+      groups.get(key).push({ x, y, name, time, value, unit, color });
     });
     const xKeys = Array.from(groups.keys()).map(Number).filter(Number.isFinite);
     if (!xKeys.length) return;
 
     const hide = () => {
       tooltip.classList.remove('show');
-      tooltip.textContent = '';
+      tooltip.innerHTML = '';
+      vline.classList.remove('show');
+      focus.classList.remove('show');
     };
 
     const showAtClientX = clientX => {
@@ -1027,13 +1120,30 @@ function bindChartPointTooltips(root) {
       const entries = groups.get(nearest.toFixed(2)) || [];
       if (!entries.length) { hide(); return; }
 
-      tooltip.textContent = entries.map(e => e.tip).join('\n');
-      const yMin = entries.reduce((acc, e) => Math.min(acc, e.y), entries[0].y);
-      const xPx = clamp((nearest / 100) * rect.width, 32, Math.max(32, rect.width - 32));
-      const yPx = clamp((yMin / 100) * rect.height - 8, 18, Math.max(18, rect.height - 18));
-      tooltip.style.left = `${xPx}px`;
-      tooltip.style.top = `${yPx}px`;
+      const focusEntry = entries[0];
+      const timeText = focusEntry.time || '--:--';
+      const rowsHtml = entries.map(entry =>
+        `<div class="chart-tooltip-row"><span class="chart-tooltip-name" style="color:${esc(entry.color || '#22c55e')}">${esc(entry.name || '--')}</span><span class="chart-tooltip-value">${esc(entry.value)}${entry.unit ? ' ' + esc(entry.unit) : ''}</span></div>`
+      ).join('');
+      tooltip.innerHTML = `<div class="chart-tooltip-time">${esc(timeText)}</div><div class="chart-tooltip-rows">${rowsHtml}</div>`;
+
+      const xPxRaw = (nearest / 100) * rect.width;
+      const xPx = clamp(xPxRaw, 12, Math.max(12, rect.width - 12));
+      const tooltipX = clamp(xPxRaw, 96, Math.max(96, rect.width - 96));
+      tooltip.style.left = `${tooltipX}px`;
+      tooltip.style.top = '10px';
       tooltip.classList.add('show');
+
+      vline.style.left = `${xPx}px`;
+      vline.classList.add('show');
+
+      const yPx = clamp((focusEntry.y / 100) * rect.height, 8, Math.max(8, rect.height - 8));
+      focus.style.left = `${xPx}px`;
+      focus.style.top = `${yPx}px`;
+      const color = focusEntry.color || '#22c55e';
+      focus.style.borderColor = color;
+      focus.style.boxShadow = `0 0 0 4px ${rgba(color, 0.28)}`;
+      focus.classList.add('show');
     };
 
     wrap.addEventListener('mousemove', e => showAtClientX(e.clientX));
@@ -1124,7 +1234,7 @@ function renderCharts(payload) {
           ).join('')}
         </div>
       </div>
-      <div class="chart-svg-wrap">${svgHtml}<div class="chart-tooltip"></div></div>
+      <div class="chart-svg-wrap">${svgHtml}<div class="chart-vline"></div><div class="chart-focus"></div><div class="chart-tooltip"></div></div>
       <div class="chart-minmax">
         <span>min ${fmtMM(mmMin, cardUnit)}</span>
         <span>max ${fmtMM(mmMax, cardUnit)}</span>
@@ -1179,20 +1289,35 @@ function renderSystemMeta(payload) {
   const system  = (payload && payload.system)  || {};
   const derived = (payload && payload.derived) || {};
 
-  const set = (id, val, cls) => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.textContent = val;
-    if (cls) el.className = 'info-val ' + cls;
-  };
+  setInfoValue('si-mode', String(network.mode || '--').toUpperCase());
+  setInfoValue('si-ip',   network.ip || '--');
+  setInfoValue('si-hostname', network.hostname || '--');
+  setInfoValue('si-firmware', system.firmware || '--');
+  setInfoValue('si-build', [system.build_date, system.build_time].filter(Boolean).join(' ') || '--');
+  setInfoValue('si-uptime', system.uptime || derived.uptime || '--');
+  setInfoValue('si-dac', system.dac_available ? 'Yes' : 'No', system.dac_available ? 'ok' : '');
 
-  set('si-mode', String(network.mode || '--').toUpperCase());
-  set('si-ip',   network.ip || '--');
-  set('si-hostname', network.hostname || '--');
-  set('si-firmware', system.firmware || '--');
-  set('si-build', [system.build_date, system.build_time].filter(Boolean).join(' ') || '--');
-  set('si-uptime', system.uptime || derived.uptime || '--');
-  set('si-dac', system.dac_available ? 'Yes' : 'No');
+  const rssi = isNum(network.rssi) ? network.rssi : null;
+  const mqttConnected = network.mqtt_connected === true;
+  const mqttEnabled = network.mqtt_enabled === true;
+  setInfoValue('cfg-mode', formatMode(network.mode), network.mode === 'off' ? 'err' : '');
+  setInfoValue('cfg-ssid', (typeof network.wifi_ssid === 'string' && network.wifi_ssid) ? network.wifi_ssid : '--');
+  setInfoValue('cfg-hostname', (typeof network.hostname === 'string' && network.hostname) ? network.hostname : '--');
+  setInfoValue('cfg-ip', (typeof network.ip === 'string' && network.ip) ? network.ip : '--');
+  if (rssi !== null) {
+    setInfoValue('cfg-rssi', rssi + ' dBm (' + rssiQuality(rssi) + ')', rssi <= -78 ? 'err' : (rssi <= -70 ? '' : 'ok'));
+  } else {
+    setInfoValue('cfg-rssi', '--');
+  }
+  setInfoValue('cfg-mqtt-broker', (typeof network.mqtt_broker === 'string' && network.mqtt_broker) ? network.mqtt_broker : '--');
+  if (mqttEnabled) {
+    setInfoValue('cfg-mqtt-status', mqttConnected ? 'Connected' : 'Disconnected', mqttConnected ? 'ok' : 'err');
+  } else {
+    setInfoValue('cfg-mqtt-status', 'Disabled');
+  }
+  updateNetworkActionButton(network);
+  updateLastSyncUi();
+  updateOtaPrecheck(network);
 
   const dacBtn = document.getElementById('openDacBtn');
   if (dacBtn) dacBtn.disabled = system.dac_available !== true;
@@ -1217,6 +1342,8 @@ const OTA_UPLOAD_MIN_TIMEOUT_MS = 180000;
 const OTA_UPLOAD_MAX_TIMEOUT_MS = 900000;
 const OTA_UPLOAD_MIN_BYTES_PER_SEC = 20 * 1024;
 let deviceClockRef = null;
+let lastStateOkAtMs = 0;
+let lastStateError = '';
 
 // Settings state
 const settings = {
@@ -1251,6 +1378,147 @@ function renderHeaderDeviceName() {
   const el = document.getElementById('deviceNameLabel');
   if (!el) return;
   el.textContent = resolveHeaderDeviceName();
+}
+
+function safeStateNetwork() {
+  return (stateCache && stateCache.network) || {};
+}
+
+function formatMode(mode) {
+  if (mode === 'ap') return 'AP';
+  if (mode === 'sta') return 'STA';
+  if (mode === 'off') return 'OFF';
+  return '--';
+}
+
+function rssiQuality(rssi) {
+  if (!isNum(rssi)) return '';
+  if (rssi >= -60) return 'Excellent';
+  if (rssi >= -67) return 'Good';
+  if (rssi >= -75) return 'Fair';
+  return 'Weak';
+}
+
+function setInfoValue(id, value, cls) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = value;
+  el.className = 'info-val' + (cls ? (' ' + cls) : '');
+}
+
+function secondsSince(tsMs) {
+  if (!tsMs) return null;
+  return Math.max(0, Math.floor((Date.now() - tsMs) / 1000));
+}
+
+function formatSyncAge(ageS) {
+  if (!isNum(ageS)) return '--';
+  if (ageS < 60) return ageS + 's ago';
+  if (ageS < 3600) return Math.floor(ageS / 60) + 'm ago';
+  return Math.floor(ageS / 3600) + 'h ago';
+}
+
+function updateLastSyncUi() {
+  const ageS = secondsSince(lastStateOkAtMs);
+  setInfoValue('cfg-last-sync', formatSyncAge(ageS), ageS === null ? '' : (ageS <= 20 ? 'ok' : (ageS <= 45 ? '' : 'err')));
+}
+
+function updateNetworkActionButton(network) {
+  const btn = document.getElementById('networkActionBtn');
+  if (!btn) return;
+  const mode = network && typeof network.mode === 'string' ? network.mode : '';
+  if (mode === 'ap') {
+    btn.href = '/';
+    btn.textContent = 'WiFi Setup';
+    return;
+  }
+  btn.href = '/dashboard';
+  btn.textContent = 'Open Dashboard';
+}
+
+function updateOtaPrecheck(network) {
+  const el = document.getElementById('otaPrecheck');
+  if (!el) return;
+
+  const mode = network && typeof network.mode === 'string' ? network.mode : '';
+  const rssi = network && isNum(network.rssi) ? network.rssi : null;
+  const ageS = secondsSince(lastStateOkAtMs);
+
+  let cls = 'warn';
+  let text = 'Waiting for live device state before OTA.';
+  if (ageS !== null && ageS > 45) {
+    cls = 'err';
+    text = 'State data is stale (' + ageS + 's). Wait for reconnect before OTA.';
+  } else if (mode === 'off') {
+    cls = 'err';
+    text = 'WiFi is offline. OTA requires AP or STA connection.';
+  } else if (mode === 'ap') {
+    cls = 'warn';
+    text = 'AP mode active. Keep this client close to Aura and stay on the same AP during OTA.';
+  } else if (mode === 'sta') {
+    if (rssi !== null && rssi <= -78) {
+      cls = 'warn';
+      text = 'STA signal is weak (' + rssi + ' dBm). OTA may fail; move closer to router/device.';
+    } else {
+      cls = 'ok';
+      text = 'Ready for OTA over STA' + (rssi !== null ? (' (' + rssi + ' dBm).') : '.');
+    }
+  }
+
+  el.className = 'ota-precheck ' + cls;
+  el.textContent = text;
+}
+
+function updateNetStatusBanner() {
+  const bar = document.getElementById('netStatusBar');
+  const textEl = document.getElementById('netStatusText');
+  const metaEl = document.getElementById('netStatusMeta');
+  if (!bar || !textEl || !metaEl) return;
+
+  const network = safeStateNetwork();
+  const modeText = formatMode(network.mode);
+  const ip = typeof network.ip === 'string' && network.ip ? network.ip : '--';
+  const ageS = secondsSince(lastStateOkAtMs);
+
+  let cls = 'warn';
+  let text = 'Connecting to device...';
+  let meta = 'No live state yet.';
+
+  if (otaUploadInFlight) {
+    cls = 'warn';
+    text = 'OTA upload in progress';
+    meta = 'Keep this tab open until upload completes.';
+  } else if (otaRestartPending) {
+    cls = 'warn';
+    text = 'Waiting for device reboot';
+    meta = 'Auto-reconnect is running.';
+  } else if (ageS === null) {
+    cls = 'warn';
+    text = 'Waiting for first state packet';
+    meta = lastStateError || 'No live data yet.';
+  } else if (ageS <= 20) {
+    cls = 'ok';
+    text = modeText + ' connected at ' + ip;
+    meta = 'Last update ' + formatSyncAge(ageS) + '.';
+  } else if (ageS <= 45) {
+    cls = 'warn';
+    text = modeText + ' data delayed';
+    meta = 'Last update ' + formatSyncAge(ageS) + '.';
+  } else {
+    cls = 'err';
+    text = 'Connection stale';
+    meta = 'Last update ' + formatSyncAge(ageS) + '. Check network path.';
+  }
+
+  if (lastStateError && ageS !== null && ageS > 20) {
+    meta += ' ' + lastStateError;
+  }
+
+  bar.className = 'net-status ' + cls;
+  textEl.textContent = text;
+  metaEl.textContent = meta;
+  updateLastSyncUi();
+  updateOtaPrecheck(network);
 }
 
 function rerenderUnitDependentViews() {
@@ -1362,6 +1630,7 @@ function updateHeaderClock() {
     settings.tempUnit === 'f' ? 'en-US' : 'en-GB',
     { day:'2-digit', month:'short', year:'numeric' }
   ).toUpperCase();
+  updateNetStatusBanner();
 }
 
 // ─────────────────────────────────────────────
@@ -1689,6 +1958,27 @@ function initOtaUI() {
       return;
     }
 
+    const network = safeStateNetwork();
+    const mode = network && typeof network.mode === 'string' ? network.mode : '';
+    const ageS = secondsSince(lastStateOkAtMs);
+    if (ageS === null || ageS > 45) {
+      statusEl.textContent = 'Live state is stale. Wait for reconnect before OTA.';
+      statusEl.className = 'ota-status err';
+      return;
+    }
+    if (mode === 'off' || !mode) {
+      statusEl.textContent = 'WiFi is offline. OTA requires AP or STA connection.';
+      statusEl.className = 'ota-status err';
+      return;
+    }
+    if (mode === 'ap') {
+      statusEl.textContent = 'AP mode detected. Keep client close to Aura; starting upload...';
+      statusEl.className = 'ota-status warn';
+    } else if (mode === 'sta' && isNum(network.rssi) && network.rssi <= -78) {
+      statusEl.textContent = 'Weak STA signal (' + network.rssi + ' dBm). Upload may fail; starting anyway...';
+      statusEl.className = 'ota-status warn';
+    }
+
     stopOtaRecoveryWatcher();
 
     otaUploadInFlight = true;
@@ -1735,7 +2025,7 @@ function initOtaUI() {
       otaRestartPending = false;
       stopOtaRecoveryWatcher();
       uploadBtn.disabled = false;
-      statusEl.textContent = 'Upload failed. Check AP connection and retry.';
+      statusEl.textContent = 'Upload failed. Check device connection and retry.';
       statusEl.className = 'ota-status err';
     };
     xhr.ontimeout = () => {
@@ -1743,7 +2033,7 @@ function initOtaUI() {
       otaRestartPending = false;
       stopOtaRecoveryWatcher();
       uploadBtn.disabled = false;
-      statusEl.textContent = 'Upload timed out. Retry closer to AP.';
+      statusEl.textContent = 'Upload timed out. Retry closer to device or with stronger WiFi.';
       statusEl.className = 'ota-status err';
     };
     xhr.send(form);
@@ -1757,6 +2047,8 @@ async function refreshState() {
   if (otaUploadInFlight || otaRestartPending) return;
   const payload = await getJson('/api/state');
   stateCache = payload;
+  lastStateOkAtMs = Date.now();
+  lastStateError = '';
 
   // Header clock
   if (isNum(payload && payload.time_epoch_s)) {
@@ -1778,6 +2070,7 @@ async function refreshState() {
 
   // Settings (non-destructive)
   if (payload.settings) applySettingsToUI(payload.settings, false);
+  updateNetStatusBanner();
 }
 
 async function refreshSensorHistory() {
@@ -1813,6 +2106,7 @@ async function refreshCharts() {
       return;
     }
     renderCharts(payload);
+    lastStateError = '';
   } catch (error) {
     if (error && error.name === 'AbortError') {
       return;
@@ -1829,6 +2123,7 @@ async function refreshEvents() {
   if (otaUploadInFlight || otaRestartPending) return;
   const payload = await getJson('/api/events');
   renderEvents(payload);
+  lastStateError = '';
 }
 
 let historyRefreshTimer = null;
@@ -1836,7 +2131,7 @@ let historyRefreshTimer = null;
 async function refreshActive() {
   if (refreshBusy || otaUploadInFlight || otaRestartPending) return;
   refreshBusy = true;
-  try { await refreshState(); } catch (_) {}
+  try { await refreshState(); } catch (_) { lastStateError = 'State refresh failed.'; updateNetStatusBanner(); }
   if (activeTab === 'charts')  { try { await refreshCharts(); } catch (_) {} }
   if (activeTab === 'events')  { try { await refreshEvents(); } catch (_) {} }
   if (activeTab === 'sensors') { try { await refreshSensorHistory(); } catch (_) {} }
@@ -1899,10 +2194,8 @@ setInterval(updateHeaderClock, 1000);
 setInterval(refreshActive, 10000);
 
 // Initial data load
-refreshState().catch(() => {});
+refreshState().catch(() => { lastStateError = 'Initial state fetch failed.'; updateNetStatusBanner(); });
 refreshSensorHistory().catch(() => {});
-refreshCharts().catch(() => {});
-refreshEvents().catch(() => {});
 </script>
 </body>
 </html>
