@@ -449,6 +449,7 @@ void AuraNetworkManager::poll() {
                     static_cast<uint32_t>(now_ms - wifi_scan_started_ms_) > kWifiScanTimeoutMs) {
                     LOGW("WiFi", "scan timeout after %u ms, aborting",
                          static_cast<unsigned>(kWifiScanTimeoutMs));
+                    wifi_scan_options_.clear();
                     stopScan();
                 }
                 if (wifi_scan_in_progress_) {
