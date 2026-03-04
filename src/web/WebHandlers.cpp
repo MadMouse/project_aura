@@ -6,6 +6,7 @@
 
 #include "web/WebHandlers.h"
 
+#include <errno.h>
 #include <math.h>
 #include <time.h>
 #include <WiFi.h>
@@ -14,6 +15,7 @@
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
 #include <esp_ota_ops.h>
+#include <lwip/sockets.h>
 #include <lvgl.h>
 #include "lvgl_v8_port.h"
 #include "config/AppConfig.h"
@@ -53,8 +55,11 @@ constexpr size_t kWebDisplayNameMaxLen = 32;
 constexpr size_t kWifiScanMaxItems = 15;
 constexpr size_t kDiagMaxErrorItems = 12;
 constexpr size_t kHttpStreamChunkSize = 1460;
-constexpr uint16_t kHttpStreamMaxZeroWrites = 12;
+constexpr uint16_t kHttpStreamMaxZeroWrites = 256;
 constexpr uint8_t kHttpStreamYieldMs = 1;
+constexpr uint8_t kHttpStreamRetryDelayFastMs = 1;
+constexpr uint8_t kHttpStreamRetryDelayMediumMs = 2;
+constexpr uint8_t kHttpStreamRetryDelaySlowMs = 5;
 constexpr uint32_t kHttpStreamMaxDurationMs = 20000;
 constexpr uint32_t kHttpStreamNoProgressTimeoutMs = 3000;
 constexpr uint32_t kHttpStreamSlowWriteWarnMs = 200;
@@ -410,25 +415,41 @@ void send_no_store_headers(WebServer &server) {
 enum class StreamAbortReason : uint8_t {
     None = 0,
     Disconnected,
+    InvalidSocket,
     ZeroWriteLimit,
     NoProgressTimeout,
-    TotalTimeout
+    TotalTimeout,
+    SocketWriteError
 };
 
 const char *stream_abort_reason_text(StreamAbortReason reason) {
     switch (reason) {
         case StreamAbortReason::Disconnected:
             return "client_disconnected";
+        case StreamAbortReason::InvalidSocket:
+            return "invalid_socket";
         case StreamAbortReason::ZeroWriteLimit:
             return "zero_write_limit";
         case StreamAbortReason::NoProgressTimeout:
             return "no_progress_timeout";
         case StreamAbortReason::TotalTimeout:
             return "total_timeout";
+        case StreamAbortReason::SocketWriteError:
+            return "socket_write_error";
         case StreamAbortReason::None:
         default:
             return "none";
     }
+}
+
+uint8_t stream_retry_delay_ms(uint16_t zero_writes) {
+    if (zero_writes <= 3) {
+        return kHttpStreamRetryDelayFastMs;
+    }
+    if (zero_writes <= 8) {
+        return kHttpStreamRetryDelayMediumMs;
+    }
+    return kHttpStreamRetryDelaySlowMs;
 }
 
 bool stream_client_bytes(NetworkClient &client,
@@ -436,12 +457,22 @@ bool stream_client_bytes(NetworkClient &client,
                          size_t size,
                          size_t &sent,
                          StreamAbortReason &abort_reason,
-                         uint32_t &max_write_ms) {
+                         uint32_t &max_write_ms,
+                         int &last_socket_errno) {
     sent = 0;
     abort_reason = StreamAbortReason::None;
     max_write_ms = 0;
+    last_socket_errno = 0;
     if (!data || size == 0) {
         return true;
+    }
+
+    const int socket_fd = client.fd();
+    if (socket_fd < 0) {
+        abort_reason = StreamAbortReason::InvalidSocket;
+        last_socket_errno = EBADF;
+        client.stop();
+        return false;
     }
 
     uint16_t zero_writes = 0;
@@ -456,51 +487,88 @@ bool stream_client_bytes(NetworkClient &client,
         }
 
         const uint32_t write_start_ms = millis();
-        const size_t written = client.write(data + sent, to_send);
+        errno = 0;
+        const ssize_t written = ::send(
+            socket_fd,
+            reinterpret_cast<const char *>(data + sent),
+            static_cast<int>(to_send),
+            MSG_DONTWAIT
+        );
         const uint32_t write_elapsed_ms = millis() - write_start_ms;
         if (write_elapsed_ms > max_write_ms) {
             max_write_ms = write_elapsed_ms;
         }
 
         const uint32_t now_ms = millis();
+        if (written > 0) {
+            sent += static_cast<size_t>(written);
+            zero_writes = 0;
+            last_progress_ms = now_ms;
+            last_socket_errno = 0;
+            if (deadline_reached(now_ms, start_ms + kHttpStreamMaxDurationMs)) {
+                abort_reason = StreamAbortReason::TotalTimeout;
+                client.stop();
+                return false;
+            }
+            if (sent < size) {
+                delay(kHttpStreamYieldMs);
+                Watchdog::kick();
+            }
+            continue;
+        }
+
         if (written == 0) {
             if (!client.connected()) {
                 abort_reason = StreamAbortReason::Disconnected;
                 client.stop();
                 return false;
             }
-            if (++zero_writes > kHttpStreamMaxZeroWrites) {
-                abort_reason = StreamAbortReason::ZeroWriteLimit;
+            last_socket_errno = 0;
+        } else {
+            last_socket_errno = errno;
+            if (last_socket_errno == ENOTCONN
+#ifdef EPIPE
+                || last_socket_errno == EPIPE
+#endif
+#ifdef ECONNRESET
+                || last_socket_errno == ECONNRESET
+#endif
+                ) {
+                abort_reason = StreamAbortReason::Disconnected;
                 client.stop();
                 return false;
             }
-            if (deadline_reached(now_ms, start_ms + kHttpStreamMaxDurationMs)) {
-                abort_reason = StreamAbortReason::TotalTimeout;
+            if (last_socket_errno != EAGAIN
+#if defined(EWOULDBLOCK) && (EWOULDBLOCK != EAGAIN)
+                && last_socket_errno != EWOULDBLOCK
+#endif
+#ifdef ENOBUFS
+                && last_socket_errno != ENOBUFS
+#endif
+                && last_socket_errno != EINTR) {
+                abort_reason = StreamAbortReason::SocketWriteError;
                 client.stop();
                 return false;
             }
-            if (deadline_reached(now_ms, last_progress_ms + kHttpStreamNoProgressTimeoutMs)) {
-                abort_reason = StreamAbortReason::NoProgressTimeout;
-                client.stop();
-                return false;
-            }
-            delay(kHttpStreamYieldMs);
-            Watchdog::kick();
-            continue;
         }
 
-        sent += written;
-        zero_writes = 0;
-        last_progress_ms = now_ms;
+        if (++zero_writes > kHttpStreamMaxZeroWrites) {
+            abort_reason = StreamAbortReason::ZeroWriteLimit;
+            client.stop();
+            return false;
+        }
         if (deadline_reached(now_ms, start_ms + kHttpStreamMaxDurationMs)) {
             abort_reason = StreamAbortReason::TotalTimeout;
             client.stop();
             return false;
         }
-        if (sent < size) {
-            delay(kHttpStreamYieldMs);
-            Watchdog::kick();
+        if (deadline_reached(now_ms, last_progress_ms + kHttpStreamNoProgressTimeoutMs)) {
+            abort_reason = StreamAbortReason::NoProgressTimeout;
+            client.stop();
+            return false;
         }
+        delay(stream_retry_delay_ms(zero_writes));
+        Watchdog::kick();
     }
     return true;
 }
@@ -516,22 +584,25 @@ bool send_html_stream(WebServer &server, const String &html) {
     size_t sent = 0;
     StreamAbortReason abort_reason = StreamAbortReason::None;
     uint32_t max_write_ms = 0;
+    int last_socket_errno = 0;
     const bool ok = stream_client_bytes(
         server.client(),
         reinterpret_cast<const uint8_t *>(html.c_str()),
         body_size,
         sent,
         abort_reason,
-        max_write_ms
+        max_write_ms,
+        last_socket_errno
     );
     if (!ok) {
         Logger::log(Logger::Warn, "Web",
-                    "HTML stream interrupted: uri=%s sent=%u/%u reason=%s max_write_ms=%u",
+                    "HTML stream interrupted: uri=%s sent=%u/%u reason=%s max_write_ms=%u err=%d",
                     server.uri().c_str(),
                     static_cast<unsigned>(sent),
                     static_cast<unsigned>(body_size),
                     stream_abort_reason_text(abort_reason),
-                    static_cast<unsigned>(max_write_ms));
+                    static_cast<unsigned>(max_write_ms),
+                    last_socket_errno);
     } else if (max_write_ms >= kHttpStreamSlowWriteWarnMs) {
         Logger::log(Logger::Warn, "Web",
                     "HTML stream slow write: uri=%s size=%u max_write_ms=%u",
@@ -552,19 +623,27 @@ bool send_html_stream_progmem(WebServer &server, const uint8_t *content, size_t 
         return true;
     }
 
-    // ESP32 NetworkClient::write_P forwards to write(), so one streaming path is enough.
+    // Use the same non-blocking socket streaming path for both RAM and PROGMEM buffers.
     size_t sent = 0;
     StreamAbortReason abort_reason = StreamAbortReason::None;
     uint32_t max_write_ms = 0;
-    const bool ok = stream_client_bytes(server.client(), content, content_size, sent, abort_reason, max_write_ms);
+    int last_socket_errno = 0;
+    const bool ok = stream_client_bytes(server.client(),
+                                        content,
+                                        content_size,
+                                        sent,
+                                        abort_reason,
+                                        max_write_ms,
+                                        last_socket_errno);
     if (!ok) {
         Logger::log(Logger::Warn, "Web",
-                    "PROGMEM HTML stream interrupted: uri=%s sent=%u/%u reason=%s max_write_ms=%u",
+                    "PROGMEM HTML stream interrupted: uri=%s sent=%u/%u reason=%s max_write_ms=%u err=%d",
                     server.uri().c_str(),
                     static_cast<unsigned>(sent),
                     static_cast<unsigned>(content_size),
                     stream_abort_reason_text(abort_reason),
-                    static_cast<unsigned>(max_write_ms));
+                    static_cast<unsigned>(max_write_ms),
+                    last_socket_errno);
     } else if (max_write_ms >= kHttpStreamSlowWriteWarnMs) {
         Logger::log(Logger::Warn, "Web",
                     "PROGMEM HTML stream slow write: uri=%s size=%u max_write_ms=%u",
