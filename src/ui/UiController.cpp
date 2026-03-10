@@ -189,8 +189,44 @@ char diag_log_level_char(Logger::Level level) {
     }
 }
 
+bool is_soft_sensor_diag_warning(const Logger::RecentEntry &entry) {
+    if (entry.level != Logger::Warn || strcmp(entry.tag, "Sensors") != 0) {
+        return false;
+    }
+
+    static constexpr const char *kSoftMetricPrefixes[] = {
+        "CO2 ", "CO ", "PM0.5 ", "PM1.0 ", "PM2.5 ",
+        "PM4.0 ", "PM10 ", "HCHO ", "VOC ", "NOx "
+    };
+    for (const char *prefix : kSoftMetricPrefixes) {
+        const size_t prefix_len = strlen(prefix);
+        if (strncmp(entry.message, prefix, prefix_len) == 0) {
+            const char *suffix = entry.message + prefix_len;
+            if (strncmp(suffix, "elevated: ", 10) == 0 ||
+                strncmp(suffix, "high: ", 6) == 0 ||
+                strncmp(suffix, "critical: ", 10) == 0) {
+                return true;
+            }
+            break;
+        }
+    }
+
+    return strstr(entry.message, " worsened to ") != nullptr ||
+           strncmp(entry.message, "Temperature outside recommended range:", 38) == 0 ||
+           strncmp(entry.message, "Humidity outside recommended range:", 35) == 0 ||
+           strcmp(entry.message, "Pressure sensor not found") == 0 ||
+           strcmp(entry.message, "SFA30 not found") == 0 ||
+           strcmp(entry.message, "SEN0466 CO not found, PM1 fallback active") == 0;
+}
+
 bool should_show_diag_log_entry(const Logger::RecentEntry &entry) {
-    return entry.level == Logger::Error || entry.level == Logger::Warn;
+    if (entry.level != Logger::Error && entry.level != Logger::Warn) {
+        return false;
+    }
+    if (is_soft_sensor_diag_warning(entry)) {
+        return false;
+    }
+    return true;
 }
 
 void compact_diag_log_message(const char *src, char *dst, size_t dst_size) {
