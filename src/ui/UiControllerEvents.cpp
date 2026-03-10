@@ -210,6 +210,8 @@ void UiController::on_temp_offset_minus_cb(lv_event_t *e) { if (instance_) insta
 void UiController::on_temp_offset_plus_cb(lv_event_t *e) { if (instance_) instance_->on_temp_offset_plus(e); }
 void UiController::on_hum_offset_minus_cb(lv_event_t *e) { if (instance_) instance_->on_hum_offset_minus(e); }
 void UiController::on_hum_offset_plus_cb(lv_event_t *e) { if (instance_) instance_->on_hum_offset_plus(e); }
+void UiController::on_diag_event_cb(lv_event_t *e) { if (instance_) instance_->on_diag_event(e); }
+void UiController::on_diag_back_event_cb(lv_event_t *e) { if (instance_) instance_->on_diag_back_event(e); }
 void UiController::on_boot_diag_continue_cb(lv_event_t *e) { if (instance_) instance_->on_boot_diag_continue(e); }
 void UiController::on_boot_diag_errors_cb(lv_event_t *e) { if (instance_) instance_->on_boot_diag_errors(e); }
 void UiController::apply_toggle_style_cb(lv_obj_t *btn) { if (instance_) instance_->apply_toggle_style(btn); }
@@ -1613,6 +1615,26 @@ void UiController::on_co2_calib_event(lv_event_t *e) {
 }
 
 void UiController::on_co2_calib_back_event(lv_event_t *e) {
+    if (lv_event_get_code(e) != LV_EVENT_CLICKED) {
+        return;
+    }
+    pending_screen_id = SCREEN_ID_PAGE_SETTINGS;
+}
+
+void UiController::on_diag_event(lv_event_t *e) {
+    if (lv_event_get_code(e) != LV_EVENT_CLICKED) {
+        return;
+    }
+    lv_obj_t *btn = lv_event_get_target(e);
+    if (btn) {
+        lv_obj_clear_state(btn, LV_STATE_CHECKED);
+    }
+    update_diag_log_ui();
+    last_diag_log_update_ms = lv_tick_get();
+    pending_screen_id = SCREEN_ID_PAGE_DIAG;
+}
+
+void UiController::on_diag_back_event(lv_event_t *e) {
     if (lv_event_get_code(e) != LV_EVENT_CLICKED) {
         return;
     }

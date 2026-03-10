@@ -64,6 +64,13 @@ constexpr uint32_t UI_POOR_GAS_BG_HEX = 0xEB0000;
 constexpr uint32_t UI_HIGH_CO2_BG_HEX = 0xB36B00;
 constexpr float UI_POOR_GAS_BG_HYSTERESIS_RATIO = 0.05f;
 constexpr int UI_HIGH_CO2_BG_ON_PPM = 3000;
+constexpr size_t UI_DIAG_LOG_MAX_LINES = 17;
+constexpr size_t UI_DIAG_LOG_RECENT_MAX = 32;
+constexpr size_t UI_DIAG_LOG_TEXT_CAPACITY = 2048;
+constexpr size_t UI_DIAG_LOG_LINE_CAPACITY = 128;
+constexpr size_t UI_DIAG_LOG_MESSAGE_MAX_CHARS = 54;
+
+Logger::RecentEntry g_diag_log_snapshot[UI_DIAG_LOG_RECENT_MAX];
 
 float map_float_clamped(float value, float in_min, float in_max, float out_min, float out_max) {
     if (in_max <= in_min) return out_min;
@@ -170,6 +177,98 @@ lv_style_t *get_high_co2_background_style() {
         initialized = true;
     }
     return &style;
+}
+
+char diag_log_level_char(Logger::Level level) {
+    switch (level) {
+        case Logger::Error: return 'E';
+        case Logger::Warn: return 'W';
+        case Logger::Info: return 'I';
+        case Logger::Debug: return 'D';
+        default: return '?';
+    }
+}
+
+bool should_show_diag_log_entry(const Logger::RecentEntry &entry) {
+    return entry.level == Logger::Error || entry.level == Logger::Warn;
+}
+
+void compact_diag_log_message(const char *src, char *dst, size_t dst_size) {
+    if (!dst || dst_size == 0) {
+        return;
+    }
+    dst[0] = '\0';
+    if (!src || src[0] == '\0') {
+        return;
+    }
+
+    size_t out = 0;
+    bool last_space = false;
+    while (*src && out + 1 < dst_size) {
+        char c = *src++;
+        if (c == '\r' || c == '\n' || c == '\t') {
+            c = ' ';
+        }
+        if (c == ' ') {
+            if (out == 0 || last_space) {
+                continue;
+            }
+            last_space = true;
+        } else {
+            last_space = false;
+        }
+        dst[out++] = c;
+    }
+
+    while (out > 0 && dst[out - 1] == ' ') {
+        --out;
+    }
+    dst[out] = '\0';
+
+    if (*src && dst_size > 4) {
+        dst[dst_size - 4] = '.';
+        dst[dst_size - 3] = '.';
+        dst[dst_size - 2] = '.';
+        dst[dst_size - 1] = '\0';
+    }
+}
+
+bool append_diag_log_line(char *text,
+                          size_t text_capacity,
+                          size_t &used,
+                          char level_char,
+                          const char *tag,
+                          const char *message) {
+    if (!text || text_capacity == 0 || used >= text_capacity) {
+        return false;
+    }
+
+    char compact_message[UI_DIAG_LOG_MESSAGE_MAX_CHARS + 1];
+    compact_diag_log_message(message, compact_message, sizeof(compact_message));
+
+    char line[UI_DIAG_LOG_LINE_CAPACITY];
+    const int written = snprintf(line,
+                                 sizeof(line),
+                                 "%c %-8.8s %s",
+                                 level_char,
+                                 (tag && tag[0] != '\0') ? tag : "SYSTEM",
+                                 compact_message[0] ? compact_message : "Event");
+    if (written <= 0) {
+        return false;
+    }
+
+    const size_t line_len = strnlen(line, sizeof(line));
+    const size_t needed = line_len + (used > 0 ? 1 : 0);
+    if (needed >= (text_capacity - used)) {
+        return false;
+    }
+    if (used > 0) {
+        text[used++] = '\n';
+    }
+    memcpy(text + used, line, line_len);
+    used += line_len;
+    text[used] = '\0';
+    return true;
 }
 
 } // namespace
@@ -735,6 +834,48 @@ void UiController::safe_label_set_text(lv_obj_t *obj, const char *new_text) {
 void UiController::safe_label_set_text_static(lv_obj_t *obj, const char *new_text) {
     if (!obj) return;
     lv_label_set_text_static(obj, new_text);
+}
+
+void UiController::update_diag_log_ui() {
+    if (!objects.system_logs) {
+        return;
+    }
+
+    if (objects.label_btn_diag_back) {
+        safe_label_set_text_static(objects.label_btn_diag_back, "BACK");
+    }
+
+    lv_label_set_long_mode(objects.system_logs, LV_LABEL_LONG_CLIP);
+
+    const size_t count = Logger::copyRecent(g_diag_log_snapshot, UI_DIAG_LOG_RECENT_MAX);
+
+    char text[UI_DIAG_LOG_TEXT_CAPACITY];
+    text[0] = '\0';
+    size_t used = 0;
+    size_t emitted = 0;
+
+    for (size_t i = count; i > 0 && emitted < UI_DIAG_LOG_MAX_LINES; --i) {
+        const Logger::RecentEntry &entry = g_diag_log_snapshot[i - 1];
+        if (!should_show_diag_log_entry(entry)) {
+            continue;
+        }
+        if (!append_diag_log_line(text,
+                                  sizeof(text),
+                                  used,
+                                  diag_log_level_char(entry.level),
+                                  entry.tag,
+                                  entry.message)) {
+            break;
+        }
+        emitted++;
+    }
+
+    if (emitted == 0) {
+        safe_label_set_text_static(objects.system_logs, "No warnings or errors in this boot.");
+        return;
+    }
+
+    safe_label_set_text(objects.system_logs, text);
 }
 
 lv_color_t UiController::color_inactive() { return lv_color_hex(0x3a3a3a); }

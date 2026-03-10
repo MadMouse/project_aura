@@ -327,6 +327,7 @@ private:
     void update_theme_custom_info(bool presets);
     void update_web_page_panel();
     void update_status_message(uint32_t now_ms, bool gas_warmup);
+    void update_diag_log_ui();
     void update_clock_labels();
     float pressure_to_display(float pressure_hpa) const;
     float pressure_delta_to_display(float pressure_delta_hpa) const;
@@ -556,6 +557,8 @@ private:
     void on_temp_offset_plus(lv_event_t *e);
     void on_hum_offset_minus(lv_event_t *e);
     void on_hum_offset_plus(lv_event_t *e);
+    void on_diag_event(lv_event_t *e);
+    void on_diag_back_event(lv_event_t *e);
     void on_boot_diag_continue(lv_event_t *e);
     void on_boot_diag_errors(lv_event_t *e);
     void on_dac_settings_event(lv_event_t *e);
@@ -708,6 +711,8 @@ private:
     static void on_temp_offset_plus_cb(lv_event_t *e);
     static void on_hum_offset_minus_cb(lv_event_t *e);
     static void on_hum_offset_plus_cb(lv_event_t *e);
+    static void on_diag_event_cb(lv_event_t *e);
+    static void on_diag_back_event_cb(lv_event_t *e);
     static void on_boot_diag_continue_cb(lv_event_t *e);
     static void on_boot_diag_errors_cb(lv_event_t *e);
     static void on_dac_settings_event_cb(lv_event_t *e);
@@ -748,7 +753,7 @@ private:
 
     bool data_dirty = true;
     bool lvgl_ready = false;
-    static constexpr size_t kScreenSlotCount = 15; // screen ids are 1..14
+    static constexpr size_t kScreenSlotCount = 16; // screen ids are 1..15
     bool screen_events_bound_[kScreenSlotCount] = {};
     bool theme_events_bound_ = false;
     int pending_screen_id = 0;
@@ -788,6 +793,7 @@ private:
     uint32_t last_blink_ms = 0;
     uint32_t last_ui_update_ms = 0;
     uint32_t last_dac_ui_update_ms = 0;
+    uint32_t last_diag_log_update_ms = 0;
     uint32_t last_ui_tick_ms = 0;
     uint32_t status_msg_last_ms = 0;
     uint32_t status_msg_signature = 0;

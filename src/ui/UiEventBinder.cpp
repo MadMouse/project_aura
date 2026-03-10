@@ -44,6 +44,8 @@ lv_obj_t *UiEventBinder::screenRootById(int screen_id) {
             return objects.page_dac_settings;
         case SCREEN_ID_PAGE_FW_UPDATE:
             return objects.page_fw_update;
+        case SCREEN_ID_PAGE_DIAG:
+            return objects.page_diag;
         default:
             return nullptr;
     }
@@ -228,6 +230,8 @@ void UiEventBinder::bindAvailableEvents(UiController &owner, int screen_id) {
         {objects.btn_temp_offset_plus, UiController::on_temp_offset_plus_cb, LV_EVENT_CLICKED},
         {objects.btn_hum_offset_minus, UiController::on_hum_offset_minus_cb, LV_EVENT_CLICKED},
         {objects.btn_hum_offset_plus, UiController::on_hum_offset_plus_cb, LV_EVENT_CLICKED},
+        {objects.btn_diag, UiController::on_diag_event_cb, LV_EVENT_CLICKED},
+        {objects.btn_diag_back, UiController::on_diag_back_event_cb, LV_EVENT_CLICKED},
         {objects.btn_theme_color, UiController::on_theme_color_event_cb, LV_EVENT_CLICKED},
         {objects.btn_theme_back, UiController::on_theme_back_event_cb, LV_EVENT_CLICKED},
         {objects.btn_diag_continue, UiController::on_boot_diag_continue_cb, LV_EVENT_CLICKED},

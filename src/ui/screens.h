@@ -22,6 +22,7 @@ typedef struct _objects_t {
     lv_obj_t *page_sensors_info;
     lv_obj_t *page_dac_settings;
     lv_obj_t *page_fw_update;
+    lv_obj_t *page_diag;
     lv_obj_t *label_boot_ver;
     lv_obj_t *background_boot_diag;
     lv_obj_t *btn_diag_continue;
@@ -216,6 +217,8 @@ typedef struct _objects_t {
     lv_obj_t *label_dac_settings;
     lv_obj_t *btn_web_page;
     lv_obj_t *label_btn_web_page;
+    lv_obj_t *btn_diag;
+    lv_obj_t *label_btn_diag;
     lv_obj_t *container_confirm;
     lv_obj_t *container_confirm_card;
     lv_obj_t *btn_confirm_ok;
@@ -847,6 +850,13 @@ typedef struct _objects_t {
     lv_obj_t *background_fw_update;
     lv_obj_t *card_fw_update;
     lv_obj_t *label_fw_update;
+    lv_obj_t *background_diag;
+    lv_obj_t *card_diag;
+    lv_obj_t *system_logs;
+    lv_obj_t *container_diag_header;
+    lv_obj_t *label_diag_title;
+    lv_obj_t *btn_diag_back;
+    lv_obj_t *label_btn_diag_back;
 } objects_t;
 
 extern objects_t objects;
@@ -866,6 +876,7 @@ enum ScreensEnum {
     SCREEN_ID_PAGE_SENSORS_INFO = 12,
     SCREEN_ID_PAGE_DAC_SETTINGS = 13,
     SCREEN_ID_PAGE_FW_UPDATE = 14,
+    SCREEN_ID_PAGE_DIAG = 15,
 };
 
 void create_screen_page_boot_logo();
@@ -909,6 +920,9 @@ void tick_screen_page_dac_settings();
 
 void create_screen_page_fw_update();
 void tick_screen_page_fw_update();
+
+void create_screen_page_diag();
+void tick_screen_page_diag();
 
 void tick_screen_by_id(enum ScreensEnum screenId);
 void tick_screen(int screen_index);

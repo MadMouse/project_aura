@@ -17,6 +17,12 @@
 
 using namespace Config;
 
+namespace {
+
+constexpr uint32_t DIAG_LOG_UPDATE_MS = 750;
+
+} // namespace
+
 void UiRenderLoop::process(UiController &owner, uint32_t now_ms) {
     bool allow_ui_update = true;
     if (owner.networkManager.state() == AuraNetworkManager::WIFI_STATE_AP_CONFIG &&
@@ -86,6 +92,12 @@ void UiRenderLoop::process(UiController &owner, uint32_t now_ms) {
         (now_ms - owner.last_dac_ui_update_ms) >= 200) {
         owner.update_dac_ui(now_ms);
         owner.last_dac_ui_update_ms = now_ms;
+        did_update = true;
+    }
+    if (owner.current_screen_id == SCREEN_ID_PAGE_DIAG &&
+        (now_ms - owner.last_diag_log_update_ms) >= DIAG_LOG_UPDATE_MS) {
+        owner.update_diag_log_ui();
+        owner.last_diag_log_update_ms = now_ms;
         did_update = true;
     }
     if (owner.data_dirty) {
