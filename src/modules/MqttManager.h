@@ -41,9 +41,11 @@ public:
     bool isUserEnabled() const { return mqtt_user_enabled_; }
     bool isEnabled() const { return mqtt_enabled_; }
     bool isConnected() { return client_.connected(); }
-    uint8_t connectFailCount() const { return mqtt_connect_fail_count_; }
     uint32_t connectAttempts() const { return mqtt_connect_attempts_; }
-    bool retryExhausted() const { return mqtt_retry_exhausted_; }
+    uint8_t retryStage() const;
+    uint32_t retryDelayMs() const;
+    static uint8_t retryStageForAttempts(uint32_t failed_attempts);
+    static uint32_t retryDelayMsForAttempts(uint32_t failed_attempts);
     bool isUiDirty() const { return ui_dirty_; }
     void clearUiDirty() { ui_dirty_ = false; }
     void markUiDirty() { ui_dirty_ = true; }
@@ -58,7 +60,6 @@ public:
 
     PubSubClient &client() { return client_; }
     bool &userEnabledRef() { return mqtt_user_enabled_; }
-    uint8_t &connectFailCountRef() { return mqtt_connect_fail_count_; }
     String &hostRef() { return mqtt_host_; }
     uint16_t &portRef() { return mqtt_port_; }
     String &userRef() { return mqtt_user_; }
@@ -119,9 +120,7 @@ private:
     bool mqtt_publish_requested_ = false;
     bool mqtt_connected_last_ = false;
     uint8_t mqtt_fail_count_ = 0;
-    uint8_t mqtt_connect_fail_count_ = 0;
     uint32_t mqtt_connect_attempts_ = 0;
-    bool mqtt_retry_exhausted_ = false;
     bool mqtt_connect_deferred_by_web_ = false;
     bool mqtt_publish_deferred_by_web_ = false;
     String mqtt_mdns_cache_host_;

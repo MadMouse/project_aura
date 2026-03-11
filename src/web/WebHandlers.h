@@ -10,6 +10,7 @@
 
 class WebServer;
 class PubSubClient;
+class MqttManager;
 class StorageManager;
 class ThemeManager;
 class FanControl;
@@ -38,8 +39,8 @@ struct WebHandlerContext {
     void (*wifi_start_sta)() = nullptr;
 
     PubSubClient *mqtt_client = nullptr;
+    MqttManager *mqtt_manager = nullptr;
     bool *mqtt_user_enabled = nullptr;
-    uint8_t *mqtt_connect_fail_count = nullptr;
     String *mqtt_host = nullptr;
     uint16_t *mqtt_port = nullptr;
     String *mqtt_user = nullptr;

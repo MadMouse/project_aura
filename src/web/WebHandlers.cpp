@@ -29,6 +29,7 @@
 #include "modules/ChartsHistory.h"
 #include "modules/DacAutoConfig.h"
 #include "modules/FanControl.h"
+#include "modules/MqttManager.h"
 #include "modules/SensorManager.h"
 #include "modules/StorageManager.h"
 #include "web/WebInputValidation.h"
@@ -93,7 +94,7 @@ constexpr StreamProfile kHtmlStreamProfile = {
 };
 
 constexpr StreamProfile kShellPageStreamProfile = {
-    768,
+    512,
     256,
     2048,
     1,
@@ -1682,7 +1683,7 @@ void mqtt_handle_root() {
     bool wifi_connected = context->wifi_is_connected ? context->wifi_is_connected() : false;
     bool wifi_enabled = context->wifi_enabled ? *context->wifi_enabled : false;
     bool mqtt_enabled = context->mqtt_user_enabled ? *context->mqtt_user_enabled : false;
-    uint8_t mqtt_fail_count = context->mqtt_connect_fail_count ? *context->mqtt_connect_fail_count : 0;
+    uint8_t mqtt_retry_stage = context->mqtt_manager ? context->mqtt_manager->retryStage() : 0;
 
     String status_text;
     String status_class;
@@ -1695,11 +1696,14 @@ void mqtt_handle_root() {
     } else if (client.connected()) {
         status_text = "Connected";
         status_class = "status-connected";
-    } else if (mqtt_fail_count < Config::MQTT_CONNECT_MAX_FAILS) {
+    } else if (mqtt_retry_stage == 0) {
         status_text = "Connecting";
         status_class = "status-error";
+    } else if (mqtt_retry_stage == 1) {
+        status_text = "Retrying";
+        status_class = "status-error";
     } else {
-        status_text = "Error";
+        status_text = "Delayed retry";
         status_class = "status-error";
     }
 

@@ -147,9 +147,9 @@ void AuraNetworkManager::begin(StorageManager &storage) {
     wifi_state_last_ = wifi_state_;
 }
 
-void AuraNetworkManager::attachMqttContext(PubSubClient &client,
+void AuraNetworkManager::attachMqttContext(MqttManager &mqtt_manager,
+                                       PubSubClient &client,
                                        bool &mqtt_user_enabled,
-                                       uint8_t &mqtt_connect_fail_count,
                                        String &mqtt_host,
                                        uint16_t &mqtt_port,
                                        String &mqtt_user,
@@ -160,9 +160,9 @@ void AuraNetworkManager::attachMqttContext(PubSubClient &client,
                                        bool &mqtt_discovery,
                                        bool &mqtt_anonymous,
                                        void (*mqtt_sync_with_wifi)()) {
+    web_ctx_.mqtt_manager = &mqtt_manager;
     web_ctx_.mqtt_client = &client;
     web_ctx_.mqtt_user_enabled = &mqtt_user_enabled;
-    web_ctx_.mqtt_connect_fail_count = &mqtt_connect_fail_count;
     web_ctx_.mqtt_host = &mqtt_host;
     web_ctx_.mqtt_port = &mqtt_port;
     web_ctx_.mqtt_user = &mqtt_user;

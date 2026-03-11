@@ -383,11 +383,10 @@ void UiController::update_status_icons() {
     } else if (mqttManager.isConnected()) {
         new_mqtt_state = 1; // green
     } else {
-        uint32_t attempts = mqttManager.connectAttempts();
-        const uint32_t stage_limit = static_cast<uint32_t>(MQTT_CONNECT_MAX_FAILS);
-        if (mqttManager.retryExhausted() || attempts >= stage_limit * 2) {
+        const uint8_t retry_stage = mqttManager.retryStage();
+        if (retry_stage >= 2) {
             new_mqtt_state = 3; // red
-        } else if (attempts >= stage_limit) {
+        } else if (retry_stage >= 1) {
             new_mqtt_state = 4; // yellow
         } else {
             new_mqtt_state = 2; // blue
@@ -480,13 +479,10 @@ void UiController::update_mqtt_ui() {
             } else if (mqttManager.isConnected()) {
                 status = UiText::MqttStatusConnected();
             } else {
-                uint32_t attempts = mqttManager.connectAttempts();
-                const uint32_t stage_limit = static_cast<uint32_t>(MQTT_CONNECT_MAX_FAILS);
-                if (mqttManager.retryExhausted()) {
-                    status = UiText::MqttStatusError();
-                } else if (attempts >= stage_limit * 2) {
+                const uint8_t retry_stage = mqttManager.retryStage();
+                if (retry_stage >= 2) {
                     status = UiText::MqttStatusRetry1h();
-                } else if (attempts >= stage_limit) {
+                } else if (retry_stage >= 1) {
                     status = UiText::MqttStatusRetry10m();
                 } else {
                     status = UiText::MqttStatusConnecting();

@@ -267,8 +267,8 @@ namespace Config {
     constexpr time_t TIME_VALID_EPOCH = 1577836800;
     constexpr uint32_t MQTT_PUBLISH_MS = 30000;
     constexpr uint32_t MQTT_RETRY_MS = 30000;
-    constexpr uint32_t MQTT_RETRY_LONG_MS = 600000;
-    constexpr uint32_t MQTT_RETRY_HOURLY_MS = 60UL * 60UL * 1000UL;
+    constexpr uint32_t MQTT_RETRY_MEDIUM_MS = 2UL * 60UL * 1000UL;
+    constexpr uint32_t MQTT_RETRY_LONG_MS = 10UL * 60UL * 1000UL;
     constexpr uint16_t MQTT_BUFFER_SIZE = 1024;
     constexpr uint16_t MQTT_DEFAULT_PORT = Secrets::MQTT_PORT;
     constexpr const char *MQTT_DEFAULT_HOST = Secrets::MQTT_HOST;
@@ -327,7 +327,8 @@ namespace Config {
     constexpr float HUM_OFFSET_MIN = -10.0f;
     constexpr float HUM_OFFSET_MAX = 10.0f;
     constexpr uint8_t MQTT_MAX_FAILS = 1;
-    constexpr uint8_t MQTT_CONNECT_MAX_FAILS = 3;
+    constexpr uint8_t MQTT_RETRY_SHORT_ATTEMPTS = 6;
+    constexpr uint8_t MQTT_RETRY_MEDIUM_ATTEMPTS = 12;
 
     struct ThemeConfig {
         bool valid = false;

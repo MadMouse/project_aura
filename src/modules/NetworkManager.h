@@ -12,6 +12,7 @@
 #include "web/WebHandlers.h"
 
 class PubSubClient;
+class MqttManager;
 class ThemeManager;
 class FanControl;
 class SensorManager;
@@ -26,9 +27,9 @@ public:
     using StateChangeCallback = void (*)(WifiState prev, WifiState curr, bool connected, void *ctx);
 
     void begin(StorageManager &storage);
-    void attachMqttContext(PubSubClient &client,
+    void attachMqttContext(MqttManager &mqtt_manager,
+                           PubSubClient &client,
                            bool &mqtt_user_enabled,
-                           uint8_t &mqtt_connect_fail_count,
                            String &mqtt_host,
                            uint16_t &mqtt_port,
                            String &mqtt_user,

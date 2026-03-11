@@ -116,9 +116,9 @@ void AppInit::initManagersAndConfig(Context &ctx, StorageManager::BootAction boo
 
     g_ui_controller = &ctx.uiController;
     ctx.networkManager.attachMqttContext(
+        ctx.mqttManager,
         ctx.mqttManager.client(),
         ctx.mqttManager.userEnabledRef(),
-        ctx.mqttManager.connectFailCountRef(),
         ctx.mqttManager.hostRef(),
         ctx.mqttManager.portRef(),
         ctx.mqttManager.userRef(),

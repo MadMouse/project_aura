@@ -22,14 +22,15 @@ namespace {
 
 MqttManager *g_mqtt = nullptr;
 
-constexpr uint8_t kMqttRetryStages = 3;
-constexpr uint8_t kMqttRetryStageAttempts = Config::MQTT_CONNECT_MAX_FAILS;
-constexpr uint8_t kMqttRetryMaxAttempts = kMqttRetryStages * kMqttRetryStageAttempts;
 constexpr size_t kTopicBufferSize = 256;
 constexpr uint32_t kMqttMdnsSuccessCacheMs = 5UL * 60UL * 1000UL;
 constexpr uint32_t kMqttMdnsFailureCacheMs = 60UL * 1000UL;
 constexpr uint16_t kMqttDefaultSocketTimeoutSec = 1;
-constexpr uint16_t kMqttConnectSocketTimeoutSec = 3;
+constexpr uint16_t kMqttConnectSocketTimeoutShortSec = 3;
+constexpr uint16_t kMqttConnectSocketTimeoutSlowSec = 5;
+constexpr uint8_t kMqttConnectAttemptsPerWindow = 2;
+constexpr uint16_t kMqttConnectRetryDelayMs = 250;
+constexpr uint8_t kMqttLongRetryLogEveryAttempts = 6;
 
 void append_json_escaped(String &out, const char *value) {
     if (!value) {
@@ -63,26 +64,37 @@ void append_json_escaped(String &out, const String &value) {
     append_json_escaped(out, value.c_str());
 }
 
-uint8_t retry_stage_for_attempts(uint32_t attempts) {
-    return static_cast<uint8_t>(attempts / kMqttRetryStageAttempts);
-}
-
-uint32_t retry_delay_for_stage(uint8_t stage) {
-    switch (stage) {
-        case 0: return Config::MQTT_RETRY_MS;
-        case 1: return Config::MQTT_RETRY_LONG_MS;
-        default: return Config::MQTT_RETRY_HOURLY_MS;
-    }
-}
-
 const char *retry_delay_label(uint32_t delay_ms) {
     if (delay_ms == Config::MQTT_RETRY_MS) {
         return "30 seconds";
     }
-    if (delay_ms == Config::MQTT_RETRY_LONG_MS) {
-        return "10 minutes";
+    if (delay_ms == Config::MQTT_RETRY_MEDIUM_MS) {
+        return "2 minutes";
     }
-    return "1 hour";
+    return "10 minutes";
+}
+
+bool should_log_connect_failure(uint32_t failed_attempts) {
+    const uint8_t stage = MqttManager::retryStageForAttempts(failed_attempts);
+    if (stage < 2) {
+        return true;
+    }
+    const uint32_t long_stage_attempt =
+        failed_attempts -
+        (static_cast<uint32_t>(Config::MQTT_RETRY_SHORT_ATTEMPTS) +
+         static_cast<uint32_t>(Config::MQTT_RETRY_MEDIUM_ATTEMPTS));
+    return long_stage_attempt <= 1 ||
+           (long_stage_attempt % kMqttLongRetryLogEveryAttempts) == 0;
+}
+
+uint16_t connect_socket_timeout_for_attempts(uint32_t failed_attempts) {
+    return MqttManager::retryStageForAttempts(failed_attempts) >= 1
+               ? kMqttConnectSocketTimeoutSlowSec
+               : kMqttConnectSocketTimeoutShortSec;
+}
+
+bool should_retry_connect_immediately(int mqtt_state) {
+    return mqtt_state == MQTT_CONNECT_FAILED || mqtt_state == MQTT_CONNECTION_TIMEOUT;
 }
 
 void build_state_topic(char *out, size_t out_size, const String &base) {
@@ -143,6 +155,35 @@ void trim_ascii(char *text) {
 } // namespace
 
 MqttManager::MqttManager() : client_(net_) {}
+
+uint8_t MqttManager::retryStageForAttempts(uint32_t failed_attempts) {
+    if (failed_attempts <= Config::MQTT_RETRY_SHORT_ATTEMPTS) {
+        return 0;
+    }
+    const uint32_t medium_limit =
+        static_cast<uint32_t>(Config::MQTT_RETRY_SHORT_ATTEMPTS) +
+        static_cast<uint32_t>(Config::MQTT_RETRY_MEDIUM_ATTEMPTS);
+    if (failed_attempts <= medium_limit) {
+        return 1;
+    }
+    return 2;
+}
+
+uint32_t MqttManager::retryDelayMsForAttempts(uint32_t failed_attempts) {
+    switch (retryStageForAttempts(failed_attempts)) {
+        case 0: return Config::MQTT_RETRY_MS;
+        case 1: return Config::MQTT_RETRY_MEDIUM_MS;
+        default: return Config::MQTT_RETRY_LONG_MS;
+    }
+}
+
+uint8_t MqttManager::retryStage() const {
+    return retryStageForAttempts(mqtt_connect_attempts_);
+}
+
+uint32_t MqttManager::retryDelayMs() const {
+    return retryDelayMsForAttempts(mqtt_connect_attempts_);
+}
 
 void MqttManager::begin(StorageManager &storage, AuraNetworkManager &network) {
     storage_ = &storage;
@@ -502,9 +543,6 @@ bool MqttManager::connectClient(const SensorData &data, bool night_mode, bool al
     if (!mqtt_enabled_) {
         return false;
     }
-    if (mqtt_retry_exhausted_) {
-        return false;
-    }
     IPAddress resolved_broker_ip;
     bool using_resolved_ip = false;
     bool is_mdns_host = false;
@@ -516,21 +554,12 @@ bool MqttManager::connectClient(const SensorData &data, bool night_mode, bool al
         if (mqtt_connect_attempts_ < UINT32_MAX) {
             mqtt_connect_attempts_++;
         }
-        if (mqtt_connect_attempts_ >= kMqttRetryMaxAttempts) {
-            mqtt_retry_exhausted_ = true;
-            mqtt_connect_fail_count_ = Config::MQTT_CONNECT_MAX_FAILS;
-            LOGW("MQTT", "retries exhausted, manual reconnect required");
-            ui_dirty_ = true;
-            return;
-        }
-        if (log_details) {
-            uint8_t stage = retry_stage_for_attempts(mqtt_connect_attempts_);
-            uint32_t delay_ms = retry_delay_for_stage(stage);
+        if (log_details && should_log_connect_failure(mqtt_connect_attempts_)) {
+            uint32_t delay_ms = retryDelayMsForAttempts(mqtt_connect_attempts_);
             Logger::log(Logger::Warn, "MQTT",
-                        "connect failed rc=%d (attempt %lu/%u), retry in %s",
+                        "connect failed rc=%d (attempt %lu), retry in %s",
                         rc,
                         static_cast<unsigned long>(mqtt_connect_attempts_),
-                        static_cast<unsigned>(kMqttRetryMaxAttempts),
                         retry_delay_label(delay_ms));
         }
         ui_dirty_ = true;
@@ -571,28 +600,46 @@ bool MqttManager::connectClient(const SensorData &data, bool night_mode, bool al
     build_availability_topic(will_topic, sizeof(will_topic), mqtt_base_topic_);
     WifiPowerSaveGuard wifi_ps_guard;
     wifi_ps_guard.suspend();
-    client_.setSocketTimeout(kMqttConnectSocketTimeoutSec);
+    const uint16_t connect_socket_timeout_sec =
+        connect_socket_timeout_for_attempts(mqtt_connect_attempts_);
+    client_.setSocketTimeout(connect_socket_timeout_sec);
     bool ok = false;
-    if (mqtt_anonymous_) {
-        ok = client_.connect(client_id, nullptr, nullptr,
-                             will_topic, 0, true, Config::MQTT_AVAIL_OFFLINE);
-    } else if (mqtt_user_.length()) {
-        ok = client_.connect(client_id, mqtt_user_.c_str(), mqtt_pass_.c_str(),
-                             will_topic, 0, true, Config::MQTT_AVAIL_OFFLINE);
-    } else {
-        ok = client_.connect(client_id, nullptr, nullptr,
-                             will_topic, 0, true, Config::MQTT_AVAIL_OFFLINE);
+    int last_state = MQTT_DISCONNECTED;
+    for (uint8_t attempt = 0; attempt < kMqttConnectAttemptsPerWindow; ++attempt) {
+        if (attempt > 0) {
+            net_.stop();
+            delay(kMqttConnectRetryDelayMs);
+        }
+        if (mqtt_anonymous_) {
+            ok = client_.connect(client_id, nullptr, nullptr,
+                                 will_topic, 0, true, Config::MQTT_AVAIL_OFFLINE);
+        } else if (mqtt_user_.length()) {
+            ok = client_.connect(client_id, mqtt_user_.c_str(), mqtt_pass_.c_str(),
+                                 will_topic, 0, true, Config::MQTT_AVAIL_OFFLINE);
+        } else {
+            ok = client_.connect(client_id, nullptr, nullptr,
+                                 will_topic, 0, true, Config::MQTT_AVAIL_OFFLINE);
+        }
+        if (ok) {
+            if (attempt > 0) {
+                LOGI("MQTT", "connected on immediate retry");
+            }
+            break;
+        }
+        last_state = client_.state();
+        if ((attempt + 1) >= kMqttConnectAttemptsPerWindow ||
+            !should_retry_connect_immediately(last_state)) {
+            break;
+        }
     }
     client_.setSocketTimeout(kMqttDefaultSocketTimeoutSec);
     if (!ok) {
-        note_connect_failure(client_.state(), true);
+        note_connect_failure(last_state, true);
         return false;
     }
     LOGI("MQTT", "connected");
     mqtt_fail_count_ = 0;
-    mqtt_connect_fail_count_ = 0;
     mqtt_connect_attempts_ = 0;
-    mqtt_retry_exhausted_ = false;
     ui_dirty_ = true;
     char subscribe_topic[kTopicBufferSize];
     snprintf(subscribe_topic, sizeof(subscribe_topic), "%s/command/#", mqtt_base_topic_.c_str());
@@ -690,9 +737,7 @@ void MqttManager::poll(const SensorData &data, bool night_mode, bool alert_blink
             client_.disconnect();
             mqtt_fail_count_ = 0;
             if (!mqtt_user_enabled_) {
-                mqtt_connect_fail_count_ = 0;
                 mqtt_connect_attempts_ = 0;
-                mqtt_retry_exhausted_ = false;
             }
         }
         if (mqtt_connected_last_) {
@@ -728,21 +773,11 @@ void MqttManager::poll(const SensorData &data, bool night_mode, bool alert_blink
     }
     if (!connected) {
         mqtt_publish_deferred_by_web_ = false;
-        if (mqtt_retry_exhausted_) {
-            mqtt_connect_deferred_by_web_ = false;
-            return;
-        }
         uint32_t now = millis();
-        if (mqtt_connect_attempts_ >= kMqttRetryMaxAttempts) {
-            mqtt_retry_exhausted_ = true;
-            mqtt_connect_fail_count_ = Config::MQTT_CONNECT_MAX_FAILS;
-            ui_dirty_ = true;
-            mqtt_connect_deferred_by_web_ = false;
-            return;
-        }
-        uint8_t stage = retry_stage_for_attempts(mqtt_connect_attempts_);
-        uint32_t retry_delay = retry_delay_for_stage(stage);
-        if (now - mqtt_last_attempt_ms_ >= retry_delay) {
+        uint32_t retry_delay = retryDelayMsForAttempts(mqtt_connect_attempts_);
+        const bool immediate_first_attempt =
+            (mqtt_connect_attempts_ == 0 && mqtt_last_attempt_ms_ == 0);
+        if (immediate_first_attempt || (now - mqtt_last_attempt_ms_ >= retry_delay)) {
             if (WebHandlersShouldPauseMqttConnect()) {
                 if (!mqtt_connect_deferred_by_web_) {
                     WebHandlersNoteMqttConnectDeferred();
@@ -785,10 +820,7 @@ void MqttManager::syncWithWifi() {
         if (mqtt_enabled_) {
             mqtt_fail_count_ = 0;
             setupClient();
-            if (!mqtt_retry_exhausted_) {
-                mqtt_connect_fail_count_ = 0;
-                mqtt_last_attempt_ms_ = 0;
-            }
+            mqtt_last_attempt_ms_ = 0;
         } else {
             if (client_.connected()) {
                 if (wifi_ready) {
@@ -800,9 +832,7 @@ void MqttManager::syncWithWifi() {
             }
             mqtt_fail_count_ = 0;
             if (!mqtt_user_enabled_) {
-                mqtt_connect_fail_count_ = 0;
                 mqtt_connect_attempts_ = 0;
-                mqtt_retry_exhausted_ = false;
             }
         }
     }
@@ -811,9 +841,7 @@ void MqttManager::syncWithWifi() {
 
 void MqttManager::requestReconnect() {
     LOGI("MQTT", "manual reconnect requested");
-    mqtt_connect_fail_count_ = 0;
     mqtt_connect_attempts_ = 0;
-    mqtt_retry_exhausted_ = false;
     mqtt_connect_deferred_by_web_ = false;
     mqtt_publish_deferred_by_web_ = false;
     mqtt_last_attempt_ms_ = 0;
@@ -835,9 +863,7 @@ void MqttManager::setUserEnabled(bool enabled) {
     mqtt_user_enabled_ = enabled;
     mqtt_connect_deferred_by_web_ = false;
     mqtt_publish_deferred_by_web_ = false;
-    mqtt_connect_fail_count_ = 0;
     mqtt_connect_attempts_ = 0;
-    mqtt_retry_exhausted_ = false;
     if (storage_) {
         storage_->saveMqttEnabled(mqtt_user_enabled_);
     }
