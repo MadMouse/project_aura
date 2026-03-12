@@ -334,6 +334,21 @@ void test_sensor_manager_bmp3xx_label_reports_bmp390() {
     TEST_ASSERT_EQUAL_STRING("BMP390:", manager.pressureSensorLabel());
 }
 
+void test_sensor_manager_falls_back_to_dps310_after_bmp_families_fail() {
+    StorageManager storage;
+    storage.begin();
+    SensorManager manager;
+
+    Bmp580::state().start_ok = false;
+    Bmp3xx::state().start_ok = false;
+    Dps310::state().start_ok = true;
+
+    manager.begin(storage, 0.0f, 0.0f);
+
+    TEST_ASSERT_EQUAL(SensorManager::PRESSURE_DPS310, manager.pressureSensorType());
+    TEST_ASSERT_EQUAL_STRING("DPS310:", manager.pressureSensorLabel());
+}
+
 void test_sensor_manager_stale_resets_temp_warning_state() {
     StorageManager storage;
     storage.begin();
@@ -396,6 +411,7 @@ int main(int, char **) {
     RUN_TEST(test_sensor_manager_bmp58x_label_reports_bmp585);
     RUN_TEST(test_sensor_manager_bmp3xx_label_reports_bmp388);
     RUN_TEST(test_sensor_manager_bmp3xx_label_reports_bmp390);
+    RUN_TEST(test_sensor_manager_falls_back_to_dps310_after_bmp_families_fail);
     RUN_TEST(test_sensor_manager_stale_resets_temp_warning_state);
     return UNITY_END();
 }

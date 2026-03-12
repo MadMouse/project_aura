@@ -5,6 +5,7 @@
 // Purchase a Commercial License: see COMMERCIAL_LICENSE_SUMMARY.md
 
 #include "drivers/Bmp3xx.h"
+#include "drivers/Bmp3xxProbe.h"
 
 #include <driver/i2c.h>
 #include <math.h>
@@ -56,26 +57,16 @@ bool Bmp3xx::begin() {
 }
 
 bool Bmp3xx::detect(uint8_t addr) {
-    uint8_t reg = Config::BMP3XX_REG_CHIP_ID;
-    uint8_t value = 0;
-    esp_err_t err = i2c_master_write_read_device(
-        Config::I2C_PORT,
-        addr,
-        &reg,
-        1,
-        &value,
-        1,
-        pdMS_TO_TICKS(Config::I2C_TIMEOUT_MS)
-    );
-    if (err != ESP_OK) {
+    Bmp3xxProbe::Variant detected = Bmp3xxProbe::Variant::Unknown;
+    if (!Bmp3xxProbe::detect(addr, detected)) {
         return false;
     }
 
-    switch (value) {
-        case Config::BMP3XX_CHIP_ID_BMP388:
+    switch (detected) {
+        case Bmp3xxProbe::Variant::BMP388:
             variant_ = Variant::BMP388;
             break;
-        case Config::BMP3XX_CHIP_ID_BMP390:
+        case Bmp3xxProbe::Variant::BMP390:
             variant_ = Variant::BMP390;
             break;
         default:
