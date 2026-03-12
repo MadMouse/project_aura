@@ -93,7 +93,7 @@ void test_sensor_manager_warmup_change() {
     TEST_ASSERT_TRUE(second.warmup_changed);
 }
 
-void test_sensor_manager_stale_resets_data() {
+void test_sensor_manager_stale_preserves_other_sensor_data() {
     StorageManager storage;
     storage.begin();
     PressureHistory history;
@@ -104,13 +104,30 @@ void test_sensor_manager_stale_resets_data() {
     data.hum_valid = true;
     data.co2_valid = true;
     data.co2 = 500;
+    data.voc_valid = true;
+    data.voc_index = 123;
+    data.nox_valid = true;
+    data.nox_index = 87;
+    data.pm1_valid = true;
+    data.pm1 = 4.2f;
     data.pressure_valid = true;
     data.pressure = 1000.0f;
+    data.hcho_valid = true;
+    data.hcho = 8.5f;
+    data.co_sensor_present = true;
+    data.co_valid = true;
+    data.co_warmup = false;
+    data.co_ppm = 2.3f;
 
     setMillis(10000);
     auto &sen = Sen66::state();
     sen.last_data_ms = getMillis() - (Config::SEN66_STALE_MS + 1);
     sen.update_last_data_on_poll = false;
+    auto &co = Sen0466::state();
+    co.present = true;
+    co.data_valid = true;
+    co.warmup = false;
+    co.co_ppm = 2.3f;
 
     SensorManager::PollResult result =
         manager.poll(data, storage, history, true);
@@ -119,7 +136,17 @@ void test_sensor_manager_stale_resets_data() {
     TEST_ASSERT_FALSE(data.temp_valid);
     TEST_ASSERT_FALSE(data.hum_valid);
     TEST_ASSERT_FALSE(data.co2_valid);
-    TEST_ASSERT_FALSE(data.pressure_valid);
+    TEST_ASSERT_FALSE(data.voc_valid);
+    TEST_ASSERT_FALSE(data.nox_valid);
+    TEST_ASSERT_FALSE(data.pm1_valid);
+    TEST_ASSERT_FALSE(data.pm_valid);
+    TEST_ASSERT_TRUE(data.pressure_valid);
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 1000.0f, data.pressure);
+    TEST_ASSERT_TRUE(data.hcho_valid);
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 8.5f, data.hcho);
+    TEST_ASSERT_TRUE(data.co_sensor_present);
+    TEST_ASSERT_TRUE(data.co_valid);
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 2.3f, data.co_ppm);
 }
 
 void test_sensor_manager_pm05_clamps_to_sensor_limit() {
@@ -197,7 +224,7 @@ int main(int, char **) {
     UNITY_BEGIN();
     RUN_TEST(test_sensor_manager_poll_updates_data);
     RUN_TEST(test_sensor_manager_warmup_change);
-    RUN_TEST(test_sensor_manager_stale_resets_data);
+    RUN_TEST(test_sensor_manager_stale_preserves_other_sensor_data);
     RUN_TEST(test_sensor_manager_pm05_clamps_to_sensor_limit);
     RUN_TEST(test_sensor_manager_pm1_invalid_resets_stale_value);
     RUN_TEST(test_sensor_manager_without_co_sensor_keeps_pm1_and_clears_co);

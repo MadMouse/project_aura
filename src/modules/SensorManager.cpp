@@ -211,6 +211,44 @@ bool apply_sanity_filters(SensorData &data) {
     return changed;
 }
 
+bool invalidate_sen66_fields(SensorData &data) {
+    bool changed = false;
+
+    auto clear_float = [&](bool &valid, float &value) {
+        if (valid || value != 0.0f) {
+            valid = false;
+            value = 0.0f;
+            changed = true;
+        }
+    };
+
+    auto clear_int = [&](bool &valid, int &value) {
+        if (valid || value != 0) {
+            valid = false;
+            value = 0;
+            changed = true;
+        }
+    };
+
+    clear_float(data.temp_valid, data.temperature);
+    clear_float(data.hum_valid, data.humidity);
+    clear_float(data.pm05_valid, data.pm05);
+    clear_float(data.pm1_valid, data.pm1);
+    clear_float(data.pm25_valid, data.pm25);
+    clear_float(data.pm4_valid, data.pm4);
+    clear_float(data.pm10_valid, data.pm10);
+    clear_int(data.co2_valid, data.co2);
+    clear_int(data.voc_valid, data.voc_index);
+    clear_int(data.nox_valid, data.nox_index);
+
+    if (data.pm_valid) {
+        data.pm_valid = false;
+        changed = true;
+    }
+
+    return changed;
+}
+
 enum class AlertBand : uint8_t {
     Unknown = 0xFF,
     Good = 0,
@@ -623,8 +661,9 @@ SensorManager::PollResult SensorManager::poll(SensorData &data,
 
     uint32_t sen66_last_ms = sen66_.lastDataMs();
     if (sen66_last_ms != 0 && (now - sen66_last_ms > Config::SEN66_STALE_MS)) {
-        data = SensorData();
-        result.data_changed = true;
+        if (invalidate_sen66_fields(data)) {
+            result.data_changed = true;
+        }
     }
     uint32_t sfa_last_ms = sfa3x_.lastDataMs();
     if (data.hcho_valid && sfa_last_ms != 0 &&

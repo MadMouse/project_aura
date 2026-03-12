@@ -8,6 +8,7 @@
 #include <math.h>
 #include <string.h>
 #include "core/Logger.h"
+#include "core/Sen66Status.h"
 #include "config/AppConfig.h"
 #include "core/I2CHelper.h"
 #include "modules/StorageManager.h"
@@ -228,6 +229,13 @@ bool Sen66::deviceReset() {
     last_voc_state_save_ms_ = 0;
     temp_offset_hw_active_ = false;
     temp_offset_hw_value_ = 0.0f;
+    last_status_ms_ = 0;
+    status_last_ = 0;
+    fail_count_ = 0;
+    co2_invalid_logged_ = false;
+    co2_invalid_since_ms_ = 0;
+    co2_first_ = true;
+    co2_idx_ = 0;
     return true;
 }
 
@@ -495,6 +503,9 @@ void Sen66::updatePressure(float pressure_hpa) {
 }
 
 bool Sen66::forceIdle() {
+    if (!measuring_) {
+        return true;
+    }
     for (int attempt = 0; attempt < 3; ++attempt) {
         if (I2C::write_cmd(Config::SEN66_ADDR, Config::SEN66_CMD_STOP, nullptr, 0) == ESP_OK) {
             delay(Config::SEN66_STOP_DELAY_MS);
@@ -616,8 +627,13 @@ bool Sen66::calibrateFRC(uint16_t ref_ppm, bool has_pressure, float pressure_hpa
     return true;
 }
 
-bool Sen66::readStatus(uint16_t &status) {
-    return readWords(Config::SEN66_CMD_READ_STATUS, &status, 1, Config::SEN66_CMD_DELAY_MS);
+bool Sen66::readStatus(uint32_t &status) {
+    uint16_t words[2] = {};
+    if (!readWords(Config::SEN66_CMD_READ_STATUS, words, 2, Config::SEN66_CMD_DELAY_MS)) {
+        return false;
+    }
+    status = (static_cast<uint32_t>(words[0]) << 16) | static_cast<uint32_t>(words[1]);
+    return true;
 }
 
 void Sen66::poll(SensorData &data, bool &changed) {
@@ -632,10 +648,22 @@ void Sen66::poll(SensorData &data, bool &changed) {
     last_poll_ms_ = now;
 
     if (now - last_status_ms_ >= Config::SEN66_STATUS_MS) {
-        uint16_t status = 0;
+        uint32_t status = 0;
         if (readStatus(status)) {
-            if (status != 0 && status != status_last_) {
-                Logger::log(Logger::Debug, "SEN66", "status: 0x%04X", status);
+            if (status != status_last_) {
+                if (status != 0) {
+                    Logger::log(Logger::Debug, "SEN66", "status: 0x%08lX",
+                                static_cast<unsigned long>(status));
+                }
+                Sen66Status::Transition transitions[8] = {};
+                const size_t transition_count =
+                    Sen66Status::collectTransitions(status_last_,
+                                                    status,
+                                                    transitions,
+                                                    sizeof(transitions) / sizeof(transitions[0]));
+                for (size_t i = 0; i < transition_count; ++i) {
+                    Logger::log(transitions[i].level, "SEN66", "%s", transitions[i].message);
+                }
             }
             status_last_ = status;
         }

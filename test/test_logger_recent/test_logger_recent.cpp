@@ -88,11 +88,29 @@ void test_alert_buffer_preserves_hard_errors_during_soft_sensor_warn_churn() {
     TEST_ASSERT_EQUAL_STRING("connect timeout", alerts[0].message);
 }
 
+void test_alert_buffer_keeps_sen66_internal_faults() {
+    Logger::log(Logger::Warn, "SEN66", "fan speed warning");
+    advanceMillis(1);
+    Logger::log(Logger::Error, "SEN66", "PM sensor error");
+
+    Logger::RecentEntry alerts[4];
+    const size_t alert_count = Logger::copyRecentAlerts(alerts, 4);
+
+    TEST_ASSERT_EQUAL_UINT32(2, alert_count);
+    TEST_ASSERT_EQUAL(Logger::Warn, alerts[0].level);
+    TEST_ASSERT_EQUAL_STRING("SEN66", alerts[0].tag);
+    TEST_ASSERT_EQUAL_STRING("fan speed warning", alerts[0].message);
+    TEST_ASSERT_EQUAL(Logger::Error, alerts[1].level);
+    TEST_ASSERT_EQUAL_STRING("SEN66", alerts[1].tag);
+    TEST_ASSERT_EQUAL_STRING("PM sensor error", alerts[1].message);
+}
+
 int main(int, char **) {
     UNITY_BEGIN();
     RUN_TEST(test_alert_buffer_keeps_only_warn_and_error);
     RUN_TEST(test_alert_buffer_survives_info_churn);
     RUN_TEST(test_alert_buffer_excludes_soft_sensor_warnings);
     RUN_TEST(test_alert_buffer_preserves_hard_errors_during_soft_sensor_warn_churn);
+    RUN_TEST(test_alert_buffer_keeps_sen66_internal_faults);
     return UNITY_END();
 }

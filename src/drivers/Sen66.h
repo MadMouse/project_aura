@@ -44,7 +44,7 @@ private:
     bool readWords(uint16_t cmd, uint16_t *out, size_t words, uint32_t delay_ms);
     bool getVocState(uint8_t *state, size_t len);
     bool setVocState(const uint8_t *state, size_t len);
-    bool readStatus(uint16_t &status);
+    bool readStatus(uint32_t &status);
     bool setTemperatureOffsetParams(float offset_c, float slope, uint16_t time_constant_s, uint16_t slot);
     bool applyTempOffsetParams();
     bool startMeasurement();
@@ -63,7 +63,7 @@ private:
     uint32_t last_poll_ms_ = 0;
     uint32_t last_status_ms_ = 0;
     uint8_t fail_count_ = 0;
-    uint16_t status_last_ = 0;
+    uint32_t status_last_ = 0;
     uint32_t retry_at_ms_ = 0;
     uint32_t measure_start_ms_ = 0;
     uint32_t last_pressure_ms_ = 0;
