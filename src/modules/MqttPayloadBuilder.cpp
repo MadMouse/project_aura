@@ -8,6 +8,7 @@
 
 #include <math.h>
 #include <stdio.h>
+#include <stdarg.h>
 
 #include "core/MathUtils.h"
 #include "config/AppConfig.h"
@@ -15,6 +16,42 @@
 namespace MqttPayloadBuilder {
 
 namespace {
+
+class BufferWriter {
+public:
+    BufferWriter(char *out, size_t out_size) : out_(out), out_size_(out_size) {
+        if (out_ && out_size_ > 0) {
+            out_[0] = '\0';
+        }
+    }
+
+    bool appendf(const char *fmt, ...) {
+        if (!out_ || out_size_ == 0 || failed_) {
+            return false;
+        }
+        va_list args;
+        va_start(args, fmt);
+        int written = vsnprintf(out_ + used_, out_size_ - used_, fmt, args);
+        va_end(args);
+        if (written < 0 || static_cast<size_t>(written) >= (out_size_ - used_)) {
+            failed_ = true;
+            out_[out_size_ - 1] = '\0';
+            return false;
+        }
+        used_ += static_cast<size_t>(written);
+        return true;
+    }
+
+    size_t size() const {
+        return failed_ ? 0 : used_;
+    }
+
+private:
+    char *out_ = nullptr;
+    size_t out_size_ = 0;
+    size_t used_ = 0;
+    bool failed_ = false;
+};
 
 void append_json_escaped(String &out, const char *value) {
     if (!value) {
@@ -138,46 +175,55 @@ String buildStatePayload(const SensorData &data,
                          bool night_mode,
                          bool alert_blink,
                          bool backlight_on) {
-    String payload;
-    payload.reserve(640); // State payload includes full telemetry set; keep headroom.
-    payload += "{";
+    char payload[Config::MQTT_BUFFER_SIZE] = {};
+    if (buildStatePayload(payload, sizeof(payload), data, night_mode, alert_blink, backlight_on) == 0) {
+        return String();
+    }
+    return String(payload);
+}
+
+size_t buildStatePayload(char *out,
+                         size_t out_size,
+                         const SensorData &data,
+                         bool night_mode,
+                         bool alert_blink,
+                         bool backlight_on) {
+    BufferWriter payload(out, out_size);
+    if (!payload.appendf("{")) {
+        return 0;
+    }
     bool first = true;
     auto add_int = [&](const char *key, bool valid, int value) {
-        if (!first) payload += ",";
+        if (!payload.appendf("%s\"%s\":", first ? "" : ",", key)) {
+            return false;
+        }
         first = false;
-        payload += "\"";
-        payload += key;
-        payload += "\":";
         if (valid) {
-            char buf[24];
-            snprintf(buf, sizeof(buf), "%d", value);
-            payload += buf;
+            return payload.appendf("%d", value);
         } else {
-            payload += "null";
+            return payload.appendf("null");
         }
     };
     auto add_float = [&](const char *key, bool valid, float value, int decimals) {
-        if (!first) payload += ",";
+        if (!payload.appendf("%s\"%s\":", first ? "" : ",", key)) {
+            return false;
+        }
         first = false;
-        payload += "\"";
-        payload += key;
-        payload += "\":";
         if (valid) {
-            char buf[24];
-            snprintf(buf, sizeof(buf), "%.*f", decimals, static_cast<double>(value));
-            payload += buf;
+            return payload.appendf("%.*f", decimals, static_cast<double>(value));
         } else {
-            payload += "null";
+            return payload.appendf("null");
         }
     };
     auto add_bool = [&](const char *key, bool value) {
-        if (!first) payload += ",";
+        if (!payload.appendf("%s\"%s\":\"%s\"",
+                             first ? "" : ",",
+                             key,
+                             value ? "ON" : "OFF")) {
+            return false;
+        }
         first = false;
-        payload += "\"";
-        payload += key;
-        payload += "\":\"";
-        payload += value ? "ON" : "OFF";
-        payload += "\"";
+        return true;
     };
 
     float dew_c = NAN;
@@ -193,32 +239,37 @@ String buildStatePayload(const SensorData &data,
         ah_valid = isfinite(ah_gm3);
     }
 
-    add_float("temp", data.temp_valid, data.temperature, 1);
-    add_float("humidity", data.hum_valid, data.humidity, 1);
-    add_float("dew_point", dew_valid, dew_c, 1);
-    add_float("absolute_humidity", ah_valid, ah_gm3, 1);
-    add_int("co2", data.co2_valid, data.co2);
+    if (!add_float("temp", data.temp_valid, data.temperature, 1) ||
+        !add_float("humidity", data.hum_valid, data.humidity, 1) ||
+        !add_float("dew_point", dew_valid, dew_c, 1) ||
+        !add_float("absolute_humidity", ah_valid, ah_gm3, 1) ||
+        !add_int("co2", data.co2_valid, data.co2)) {
+        return 0;
+    }
     const bool co_valid = data.co_sensor_present &&
                           data.co_valid &&
                           isfinite(data.co_ppm) &&
                           data.co_ppm >= 0.0f;
-    add_float("co", co_valid, data.co_ppm, 1);
-    add_int("voc_index", data.voc_valid, data.voc_index);
-    add_int("nox_index", data.nox_valid, data.nox_index);
-    add_float("hcho", data.hcho_valid, data.hcho, 1);
-    add_float("pm05", data.pm05_valid, data.pm05, 1);
-    add_float("pm1", data.pm1_valid, data.pm1, 1);
-    add_float("pm4", data.pm4_valid, data.pm4, 1);
-    add_float("pm25", data.pm25_valid, data.pm25, 1);
-    add_float("pm10", data.pm10_valid, data.pm10, 1);
-    add_float("pressure", data.pressure_valid, data.pressure, 1);
-    add_float("pressure_delta_3h", data.pressure_delta_3h_valid, data.pressure_delta_3h, 1);
-    add_float("pressure_delta_24h", data.pressure_delta_24h_valid, data.pressure_delta_24h, 1);
-    add_bool("night_mode", night_mode);
-    add_bool("alert_blink", alert_blink);
-    add_bool("backlight", backlight_on);
-    payload += "}";
-    return payload;
+    if (!add_float("co", co_valid, data.co_ppm, 1) ||
+        !add_int("voc_index", data.voc_valid, data.voc_index) ||
+        !add_int("nox_index", data.nox_valid, data.nox_index) ||
+        !add_float("hcho", data.hcho_valid, data.hcho, 1) ||
+        !add_float("pm05", data.pm05_valid, data.pm05, 1) ||
+        !add_float("pm1", data.pm1_valid, data.pm1, 1) ||
+        !add_float("pm4", data.pm4_valid, data.pm4, 1) ||
+        !add_float("pm25", data.pm25_valid, data.pm25, 1) ||
+        !add_float("pm10", data.pm10_valid, data.pm10, 1) ||
+        !add_float("pressure", data.pressure_valid, data.pressure, 1) ||
+        !add_float("pressure_delta_3h", data.pressure_delta_3h_valid, data.pressure_delta_3h, 1) ||
+        !add_float("pressure_delta_24h", data.pressure_delta_24h_valid, data.pressure_delta_24h, 1) ||
+        !add_bool("night_mode", night_mode) ||
+        !add_bool("alert_blink", alert_blink) ||
+        !add_bool("backlight", backlight_on) ||
+        !payload.appendf("}")) {
+        return 0;
+    }
+
+    return payload.size();
 }
 
 } // namespace MqttPayloadBuilder

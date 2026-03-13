@@ -6,6 +6,7 @@
 
 #include "modules/TimeManager.h"
 
+#include <limits>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -64,6 +65,47 @@ bool setSystemEpoch(time_t epoch) {
     tv.tv_usec = 0;
     return settimeofday(&tv, nullptr) == 0;
 #endif
+}
+
+int64_t daysFromCivil(int year, unsigned month, unsigned day) {
+    year -= month <= 2 ? 1 : 0;
+    const int era = (year >= 0 ? year : year - 399) / 400;
+    const unsigned year_of_era = static_cast<unsigned>(year - era * 400);
+    const int adjusted_month = static_cast<int>(month) + (month > 2 ? -3 : 9);
+    const unsigned day_of_year =
+        (153U * static_cast<unsigned>(adjusted_month) + 2U) / 5U + day - 1U;
+    const unsigned day_of_era =
+        year_of_era * 365U + year_of_era / 4U - year_of_era / 100U + day_of_year;
+    return static_cast<int64_t>(era) * 146097LL + static_cast<int64_t>(day_of_era) - 719468LL;
+}
+
+time_t utcTmToEpoch(const tm &utc_tm) {
+    const int year = utc_tm.tm_year + 1900;
+    const int month = utc_tm.tm_mon + 1;
+    const int day = utc_tm.tm_mday;
+    if (month < 1 || month > 12) {
+        return static_cast<time_t>(-1);
+    }
+    if (day < 1 || day > TimeManager::daysInMonth(year, month)) {
+        return static_cast<time_t>(-1);
+    }
+    if (utc_tm.tm_hour < 0 || utc_tm.tm_hour > 23 ||
+        utc_tm.tm_min < 0 || utc_tm.tm_min > 59 ||
+        utc_tm.tm_sec < 0 || utc_tm.tm_sec > 59) {
+        return static_cast<time_t>(-1);
+    }
+
+    const int64_t days = daysFromCivil(year, static_cast<unsigned>(month), static_cast<unsigned>(day));
+    const int64_t seconds =
+        days * 86400LL +
+        static_cast<int64_t>(utc_tm.tm_hour) * 3600LL +
+        static_cast<int64_t>(utc_tm.tm_min) * 60LL +
+        static_cast<int64_t>(utc_tm.tm_sec);
+    if (seconds < static_cast<int64_t>(std::numeric_limits<time_t>::min()) ||
+        seconds > static_cast<int64_t>(std::numeric_limits<time_t>::max())) {
+        return static_cast<time_t>(-1);
+    }
+    return static_cast<time_t>(seconds);
 }
 
 } // namespace
@@ -449,12 +491,7 @@ void TimeManager::buildFixedTzString(int offset_min, char *out, size_t len) {
 }
 
 time_t TimeManager::makeUtcEpoch(const tm &utc_tm) {
-    setTimezoneEnv("UTC0");
-    tzset();
-    tm tmp = utc_tm;
-    time_t t = mktime(&tmp);
-    applyTimezone();
-    return t;
+    return utcTmToEpoch(utc_tm);
 }
 
 bool TimeManager::setSystemTime(time_t epoch) {

@@ -517,11 +517,20 @@ void MqttManager::publishState(const SensorData &data, bool night_mode, bool ale
     if (!client_.connected()) {
         return;
     }
-    String payload = MqttPayloadBuilder::buildStatePayload(data, night_mode, alert_blink, backlight_on);
+    const size_t payload_len = MqttPayloadBuilder::buildStatePayload(
+        mqtt_state_payload_buf_, sizeof(mqtt_state_payload_buf_),
+        data, night_mode, alert_blink, backlight_on);
+    if (payload_len == 0) {
+        Logger::log(Logger::Warn, "MQTT", "state payload build failed");
+        return;
+    }
 
     char topic[kTopicBufferSize];
     build_state_topic(topic, sizeof(topic), mqtt_base_topic_);
-    bool published = client_.publish(topic, payload.c_str(), true);
+    bool published = client_.publish(topic,
+                                     reinterpret_cast<const uint8_t *>(mqtt_state_payload_buf_),
+                                     static_cast<unsigned int>(payload_len),
+                                     true);
 
     if (published) {
         mqtt_fail_count_ = 0;

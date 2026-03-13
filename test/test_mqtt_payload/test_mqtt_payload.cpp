@@ -63,6 +63,27 @@ void test_state_payload_includes_co_when_sensor_present_and_valid() {
     assert_contains(payload, "\"backlight\":\"OFF\"");
 }
 
+void test_state_payload_buffer_builder_matches_string_payload() {
+    SensorData data{};
+    data.temp_valid = true;
+    data.temperature = 21.6f;
+    data.hum_valid = true;
+    data.humidity = 43.5f;
+    data.co2_valid = true;
+    data.co2 = 745;
+    data.pm25_valid = true;
+    data.pm25 = 11.2f;
+    data.pressure_valid = true;
+    data.pressure = 1009.4f;
+
+    char payload[512] = {};
+    size_t written = MqttPayloadBuilder::buildStatePayload(payload, sizeof(payload), data, true, true, false);
+    TEST_ASSERT_GREATER_THAN_UINT32(0, static_cast<uint32_t>(written));
+
+    String string_payload = MqttPayloadBuilder::buildStatePayload(data, true, true, false);
+    TEST_ASSERT_EQUAL_STRING(string_payload.c_str(), payload);
+}
+
 void test_discovery_sensor_payload_contains_pm05_template_and_topics() {
     const String device_id = "aura_test";
     const String device_name = "Aura \"Kitchen\"";
@@ -95,6 +116,7 @@ int main(int, char **) {
     UNITY_BEGIN();
     RUN_TEST(test_state_payload_includes_pm05_pm1_pm4_and_co_null_without_sensor);
     RUN_TEST(test_state_payload_includes_co_when_sensor_present_and_valid);
+    RUN_TEST(test_state_payload_buffer_builder_matches_string_payload);
     RUN_TEST(test_discovery_sensor_payload_contains_pm05_template_and_topics);
     return UNITY_END();
 }

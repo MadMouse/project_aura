@@ -103,8 +103,10 @@ private:
     bool ui_dirty_ = false;
 
     static constexpr size_t kMqttHostBufferSize = 256;
+    static constexpr size_t kMqttStatePayloadBufferSize = Config::MQTT_BUFFER_SIZE;
     String mqtt_host_;
     char mqtt_host_buf_[kMqttHostBufferSize] = {0};
+    char mqtt_state_payload_buf_[kMqttStatePayloadBufferSize] = {0};
     uint16_t mqtt_port_ = Config::MQTT_DEFAULT_PORT;
     String mqtt_user_;
     String mqtt_pass_;

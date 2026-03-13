@@ -109,6 +109,22 @@ void seedPcf8523WithFreshValidTime() {
     I2cMock::setRegister(Config::PCF8523_ADDR, Config::PCF8523_REG_CONTROL_3, 0x00);
 }
 
+void seedPcf8523WithLeapDayValidTime() {
+    I2cMock::setDevicePresent(Config::PCF8523_ADDR, true);
+    I2cMock::setReadWrap(Config::PCF8523_ADDR, Config::PCF8523_REG_TMR_B_REG);
+
+    const uint8_t signature[] = {0x00, 0x00, 0x07, 0x00, 0x07};
+    I2cMock::setRegisters(Config::PCF8523_ADDR, Config::PCF8523_REG_OFFSET,
+                          signature, sizeof(signature));
+
+    const uint8_t time_regs[] = {
+        toBcd(0), toBcd(0), toBcd(0), toBcd(29), 0x04, toBcd(2), toBcd(24)
+    };
+    I2cMock::setRegisters(Config::PCF8523_ADDR, Config::PCF8523_REG_SECONDS,
+                          time_regs, sizeof(time_regs));
+    I2cMock::setRegister(Config::PCF8523_ADDR, Config::PCF8523_REG_CONTROL_3, 0x00);
+}
+
 void seedPcf8523ThatLooksLikeWeakDs3231() {
     I2cMock::setDevicePresent(Config::PCF8523_ADDR, true);
     I2cMock::setReadWrap(Config::PCF8523_ADDR, Config::PCF8523_REG_TMR_B_REG);
@@ -307,6 +323,36 @@ void test_time_manager_init_rtc_manual_ds3231_mode_does_not_fall_back_to_pcf8523
     TEST_ASSERT_EQUAL_STRING("RTC", manager.rtcLabel());
 }
 
+void test_time_manager_init_rtc_sets_system_epoch_from_utc_time() {
+    seedPcf8523WithFreshValidTime();
+
+    StorageManager storage;
+    storage.begin();
+
+    TimeManager manager;
+    manager.begin(storage);
+
+    TEST_ASSERT_TRUE(manager.initRtc());
+    TEST_ASSERT_TRUE(manager.isRtcPresent());
+    TEST_ASSERT_TRUE(manager.isRtcValid());
+    TEST_ASSERT_EQUAL_INT64(1776256496LL, static_cast<long long>(mockNow()));
+}
+
+void test_time_manager_init_rtc_sets_system_epoch_for_leap_day() {
+    seedPcf8523WithLeapDayValidTime();
+
+    StorageManager storage;
+    storage.begin();
+
+    TimeManager manager;
+    manager.begin(storage);
+
+    TEST_ASSERT_TRUE(manager.initRtc());
+    TEST_ASSERT_TRUE(manager.isRtcPresent());
+    TEST_ASSERT_TRUE(manager.isRtcValid());
+    TEST_ASSERT_EQUAL_INT64(1709164800LL, static_cast<long long>(mockNow()));
+}
+
 void test_time_manager_init_rtc_keeps_detected_pcf8523_when_begin_fails() {
     seedPcf8523WithOldValidTime();
     I2cMock::setWriteFailure(Config::PCF8523_ADDR, Config::PCF8523_REG_CONTROL_3, true);
@@ -411,6 +457,8 @@ int main(int, char **) {
     RUN_TEST(test_time_manager_init_rtc_respects_manual_pcf8523_mode);
     RUN_TEST(test_time_manager_init_rtc_respects_manual_ds3231_mode);
     RUN_TEST(test_time_manager_init_rtc_manual_ds3231_mode_does_not_fall_back_to_pcf8523);
+    RUN_TEST(test_time_manager_init_rtc_sets_system_epoch_from_utc_time);
+    RUN_TEST(test_time_manager_init_rtc_sets_system_epoch_for_leap_day);
     RUN_TEST(test_time_manager_init_rtc_keeps_detected_pcf8523_when_begin_fails);
     RUN_TEST(test_time_manager_init_rtc_keeps_detected_pcf8523_when_initial_read_fails);
     RUN_TEST(test_time_manager_poll_marks_detected_rtc_invalid_after_repeated_read_failures);
