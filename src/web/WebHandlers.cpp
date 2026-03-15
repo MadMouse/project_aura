@@ -46,7 +46,7 @@ constexpr uint32_t kDeferredActionDelayMs = 200;
 constexpr uint32_t kDeferredRestartDelayMs = 1500;
 constexpr uint32_t kTaskWdtDefaultMs = 180000;
 constexpr uint32_t kTaskWdtOtaMs = 10UL * 60UL * 1000UL;
-constexpr uint32_t kWebStreamMqttServiceIntervalMs = 1000;
+constexpr uint32_t kWebStreamMqttServiceIntervalMs = 250;
 bool g_deferred_wifi_start_sta = false;
 bool g_deferred_mqtt_sync = false;
 OtaDeferredRestart::Controller g_restart_controller;
@@ -840,8 +840,8 @@ bool stream_client_bytes(NetworkClient &client,
         }
 
         const uint32_t now_ms = millis();
+        maybe_service_connected_mqtt_during_web_stream(now_ms, last_mqtt_service_ms);
         if (written > 0) {
-            maybe_service_connected_mqtt_during_web_stream(now_ms, last_mqtt_service_ms);
             sent += static_cast<size_t>(written);
             zero_writes = 0;
             last_progress_ms = now_ms;
@@ -1042,7 +1042,11 @@ bool send_progmem_asset(WebServer &server,
     if (profile.disable_wifi_power_save) {
         wifi_ps_guard.suspend();
     }
-    configure_http_stream_client(server.client());
+    const bool low_latency_html =
+        strcmp(content_type, "text/html; charset=utf-8") == 0 || profile_override != nullptr;
+    if (low_latency_html) {
+        configure_http_stream_client(server.client());
+    }
     apply_asset_cache_headers(server, cache_mode);
     server.setContentLength(content_size);
     if (gzip_encoded) {
