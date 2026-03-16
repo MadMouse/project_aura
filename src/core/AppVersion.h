@@ -14,9 +14,31 @@
 #define APP_BUILD_ID "nogit"
 #endif
 
-#define APP_VERSION_FULL APP_VERSION "-" APP_BUILD_ID
-
 namespace AppVersion {
+
+inline bool isNumeric(char c) {
+    return c >= '0' && c <= '9';
+}
+
+inline bool isStableRelease() {
+    const char *version = APP_VERSION;
+    bool saw_digit = false;
+    bool saw_dot = false;
+
+    for (; *version; ++version) {
+        if (isNumeric(*version)) {
+            saw_digit = true;
+            continue;
+        }
+        if (*version == '.') {
+            saw_dot = true;
+            continue;
+        }
+        return false;
+    }
+
+    return saw_digit && saw_dot;
+}
 
 inline const char *shortVersion() {
     return APP_VERSION;
@@ -27,7 +49,10 @@ inline const char *buildId() {
 }
 
 inline const char *fullVersion() {
-    return APP_VERSION_FULL;
+    if (isStableRelease()) {
+        return APP_VERSION;
+    }
+    return APP_VERSION "-" APP_BUILD_ID;
 }
 
 } // namespace AppVersion
