@@ -119,6 +119,10 @@ void UiScreenFlow::processDeferredUnloads(UiController &owner, uint32_t now_ms) 
                 unload_screen_id < static_cast<int>(owner.kScreenSlotCount)) {
                 owner.screen_events_bound_[unload_screen_id] = false;
             }
+            if (unload_screen_id == SCREEN_ID_PAGE_THEME) {
+                // Theme screen is rebuilt lazily, so its swatch callbacks must be rebound.
+                owner.theme_events_bound_ = false;
+            }
             owner.deferred_unload_.clear(i);
         } else {
             // Screen switch may still be settling; retry shortly.

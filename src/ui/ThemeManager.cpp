@@ -170,6 +170,7 @@ void ThemeManager::applyActive(bool night_mode, bool &datetime_ui_dirty) {
 }
 
 void ThemeManager::selectSwatchByCurrent() {
+    initSwatches();
     selectSwatchByColors(current_);
 }
 
@@ -258,6 +259,11 @@ bool ThemeManager::readFromSwatch(const ThemeSwatch &swatch, ThemeColors &out) c
     if (!swatch.btn || !swatch.card || !swatch.label) {
         return false;
     }
+    if (!lv_obj_is_valid(swatch.btn) ||
+        !lv_obj_is_valid(swatch.card) ||
+        !lv_obj_is_valid(swatch.label)) {
+        return false;
+    }
     out.screen_bg = lv_obj_get_style_bg_color(swatch.btn, LV_PART_MAIN);
     out.screen_gradient_color = lv_obj_get_style_bg_grad_color(swatch.btn, LV_PART_MAIN);
     out.screen_gradient_direction = lv_obj_get_style_bg_grad_dir(swatch.btn, LV_PART_MAIN);
@@ -314,7 +320,7 @@ void ThemeManager::setSelectedSwatch(const ThemeSwatch *selected) {
     selected_index_ = -1;
     for (size_t i = 0; i < Config::THEME_SWATCH_COUNT; i++) {
         lv_obj_t *btn = swatches_[i].btn;
-        if (!btn) {
+        if (!btn || !lv_obj_is_valid(btn)) {
             continue;
         }
         if (selected && btn == selected->btn) {

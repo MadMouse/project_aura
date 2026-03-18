@@ -460,7 +460,7 @@ void UiController::on_theme_back_event(lv_event_t *e) {
     if (lv_event_get_code(e) != LV_EVENT_CLICKED) {
         return;
     }
-    if (themeManager.hasPreview()) {
+    if (themeManager.hasUnsavedPreview()) {
         themeManager.applyPreviewAsCurrent(storage, night_mode, datetime_ui_dirty);
     }
     themeManager.setThemeScreenOpen(false);
