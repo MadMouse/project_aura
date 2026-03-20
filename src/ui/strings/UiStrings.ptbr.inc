@@ -114,7 +114,7 @@
     "INICIAR AP",
     "CONFIG. MQTT",
     "Status MQTT:",
-    "Para configurar MQTT:\n- Abra {{IP_URL}} no navegador\nou escaneie o QR.\n- Hostname alternativo:\n{{LOCAL_URL}}",
+    "Para configurar MQTT:\n- Abra {{IP_URL}} no navegador ou escaneie o QR.\n- Host alternativo: {{LOCAL_URL}}",
     "IP dispositivo:",
     "IP broker:",
     "Tópico:",

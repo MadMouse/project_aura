@@ -114,7 +114,7 @@
     "AP START",
     "MQTT EINSTELLUNGEN",
     "MQTT Status:",
-    "MQTT einrichten:\n- Öffne {{IP_URL}} im Browser\noder scanne den QR-Code.\n- Alternativer Hostname:\n{{LOCAL_URL}}",
+    "MQTT einrichten:\n- Öffne {{IP_URL}} im Browser oder scanne den QR.\n- Alt. Host: {{LOCAL_URL}}",
     "Gerät IP:",
     "Broker IP:",
     "Topic:",

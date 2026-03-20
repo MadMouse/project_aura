@@ -114,7 +114,7 @@
     "启动AP",
     "MQTT 设置",
     "MQTT 状态:",
-    "配置 MQTT:\n- 在浏览器打开 {{IP_URL}}\n或扫描二维码.\n- 备用主机名:\n{{LOCAL_URL}}",
+    "配置 MQTT:\n- 在浏览器打开 {{IP_URL}} 或扫描二维码.\n- 备用主机: {{LOCAL_URL}}",
     "设备 IP:",
     "Broker IP:",
     "Topic:",

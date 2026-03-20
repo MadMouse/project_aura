@@ -114,7 +114,7 @@
     "START AP",
     "MQTT INSTELL.",
     "MQTT status:",
-    "MQTT instellen:\n- Open {{IP_URL}} in de browser\nof scan de QR-code.\n- Alternatieve hostnaam:\n{{LOCAL_URL}}",
+    "MQTT instellen:\n- Open {{IP_URL}} in de browser of scan de QR.\n- Alt. host: {{LOCAL_URL}}",
     "Apparaat IP:",
     "Broker IP:",
     "Topic:",

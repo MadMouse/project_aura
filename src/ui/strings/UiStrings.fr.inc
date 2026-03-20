@@ -114,7 +114,7 @@
     "DÉMARRER AP",
     "RÉGLAGES MQTT",
     "Statut MQTT:",
-    "Pour configurer MQTT:\n- Ouvrez {{IP_URL}} dans le\nnavigateur ou scannez le QR.\n- Nom d'hote alternatif:\n{{LOCAL_URL}}",
+    "Pour configurer MQTT:\n- Ouvrez {{IP_URL}} dans le navigateur ou scannez le QR.\n- Hote alt.: {{LOCAL_URL}}",
     "IP appareil:",
     "IP broker:",
     "Topic:",
