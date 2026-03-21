@@ -107,8 +107,6 @@ void ota_restore_wifi_power_save();
 
 void ota_set_error(const String &error) {
     g_ota_state.setErrorOnce(error);
-    ota_restore_wifi_power_save();
-    ota_set_ui_screen(false);
 }
 
 void ota_disable_wifi_power_save_for_upload() {

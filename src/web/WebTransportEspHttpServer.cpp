@@ -15,11 +15,14 @@
 #include <vector>
 
 #include <esp_http_server.h>
+#include <lwip/sockets.h>
 
 namespace {
 
-constexpr uint16_t kHttpServerRecvWaitTimeoutS = 30;
+constexpr uint16_t kHttpServerRecvWaitTimeoutS = 10;
 constexpr uint16_t kHttpServerSendWaitTimeoutS = 30;
+constexpr uint32_t kMultipartReadIdleTimeoutMs = 90UL * 1000UL;
+constexpr uint32_t kDrainRecvTimeoutMs = 200;
 
 } // namespace
 
@@ -146,6 +149,10 @@ public:
             buffer_.reserve(2048);
         }
 
+        size_t remainingBytesOnSocket() const {
+            return remaining_;
+        }
+
         bool readLine(String &line) {
             while (true) {
                 auto it = std::search(buffer_.begin(),
@@ -210,15 +217,32 @@ public:
             }
 
             char chunk[2048];
-            const size_t to_read = remaining_ < sizeof(chunk) ? remaining_ : sizeof(chunk);
-            const int received = httpd_req_recv(req_, chunk, to_read);
-            if (received <= 0) {
+            while (remaining_ > 0) {
+                const size_t to_read = remaining_ < sizeof(chunk) ? remaining_ : sizeof(chunk);
+                const int received = httpd_req_recv(req_, chunk, to_read);
+                if (received > 0) {
+                    timeout_window_active_ = false;
+                    timeout_window_start_ms_ = 0;
+                    buffer_.insert(buffer_.end(), chunk, chunk + received);
+                    remaining_ -= static_cast<size_t>(received);
+                    return true;
+                }
+                if (received == HTTPD_SOCK_ERR_TIMEOUT) {
+                    const uint32_t now_ms = millis();
+                    if (!timeout_window_active_) {
+                        timeout_window_active_ = true;
+                        timeout_window_start_ms_ = now_ms;
+                    }
+                    if (static_cast<uint32_t>(now_ms - timeout_window_start_ms_) >=
+                        kMultipartReadIdleTimeoutMs) {
+                        return false;
+                    }
+                    delay(1);
+                    continue;
+                }
                 return false;
             }
-
-            buffer_.insert(buffer_.end(), chunk, chunk + received);
-            remaining_ -= static_cast<size_t>(received);
-            return true;
+            return false;
         }
 
         bool ensureAvailable(size_t count) {
@@ -259,6 +283,8 @@ public:
         httpd_req_t *req_ = nullptr;
         size_t remaining_ = 0;
         std::vector<uint8_t> buffer_{};
+        bool timeout_window_active_ = false;
+        uint32_t timeout_window_start_ms_ = 0;
         static constexpr char kCrLf[2] = {'\r', '\n'};
     };
 
@@ -268,6 +294,7 @@ public:
         raw_body_ = "";
         upload_ = {};
         stream_open_ = false;
+        pending_body_bytes_ = 0;
     }
 
     void reset() {
@@ -276,6 +303,7 @@ public:
         raw_body_ = "";
         upload_ = {};
         stream_open_ = false;
+        pending_body_bytes_ = 0;
     }
 
     void appendArgsFromQuery() {
@@ -316,6 +344,10 @@ public:
 
     void setUpload(const WebUpload &upload) {
         upload_ = upload;
+    }
+
+    void setPendingBodyBytes(size_t pending_body_bytes) {
+        pending_body_bytes_ = pending_body_bytes;
     }
 
     bool hasArg(const char *name) const override {
@@ -376,6 +408,62 @@ public:
 
     bool clientConnected() const override {
         return req_ != nullptr;
+    }
+
+    size_t pendingRequestBodyBytes() const override {
+        return pending_body_bytes_;
+    }
+
+    size_t drainPendingRequestBody(size_t max_bytes, uint32_t max_time_ms) override {
+        if (!req_ || pending_body_bytes_ == 0 || max_bytes == 0 || max_time_ms == 0) {
+            return 0;
+        }
+
+        const int sockfd = httpd_req_to_sockfd(req_);
+        if (sockfd < 0) {
+            return 0;
+        }
+
+        timeval recv_timeout{};
+        recv_timeout.tv_sec = static_cast<long>(kDrainRecvTimeoutMs / 1000UL);
+        recv_timeout.tv_usec =
+            static_cast<long>((kDrainRecvTimeoutMs % 1000UL) * 1000UL);
+        setsockopt(sockfd,
+                   SOL_SOCKET,
+                   SO_RCVTIMEO,
+                   &recv_timeout,
+                   sizeof(recv_timeout));
+
+        const uint32_t deadline_ms = millis() + max_time_ms;
+        size_t drained = 0;
+        uint8_t drain_buffer[1024];
+        while (pending_body_bytes_ > 0 && drained < max_bytes) {
+            if (static_cast<int32_t>(millis() - deadline_ms) >= 0) {
+                break;
+            }
+
+            const size_t remaining_budget = max_bytes - drained;
+            const size_t read_size =
+                std::min(sizeof(drain_buffer),
+                         std::min(remaining_budget, pending_body_bytes_));
+            const int received =
+                recv(sockfd, reinterpret_cast<char *>(drain_buffer), read_size, 0);
+            if (received > 0) {
+                drained += static_cast<size_t>(received);
+                pending_body_bytes_ -= static_cast<size_t>(received);
+                continue;
+            }
+            if (received == 0) {
+                pending_body_bytes_ = 0;
+                break;
+            }
+
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                continue;
+            }
+            break;
+        }
+        return drained;
     }
 
     void stopClient() override {
@@ -445,6 +533,7 @@ private:
     String raw_body_;
     WebUpload upload_{};
     bool stream_open_ = false;
+    size_t pending_body_bytes_ = 0;
 };
 
 EspHttpServerBackend::EspHttpServerBackend(uint16_t port) : port_(port) {
@@ -567,6 +656,7 @@ bool EspHttpServerBackend::prepareRequest(RouteRegistration &route, void *raw_re
             while (true) {
                 if (!reader.readLine(line)) {
                     if (saw_upload_part) {
+                        request_->setPendingBodyBytes(reader.remainingBytesOnSocket());
                         WebUpload aborted{};
                         aborted.status = WebUploadStatus::Aborted;
                         request_->setUpload(aborted);
@@ -620,6 +710,7 @@ bool EspHttpServerBackend::prepareRequest(RouteRegistration &route, void *raw_re
                     final_boundary);
 
                 if (!stream_ok) {
+                    request_->setPendingBodyBytes(reader.remainingBytesOnSocket());
                     WebUpload aborted{};
                     aborted.status = WebUploadStatus::Aborted;
                     aborted.filename = filename;
@@ -652,6 +743,7 @@ bool EspHttpServerBackend::prepareRequest(RouteRegistration &route, void *raw_re
 
             if (!part_ok) {
                 if (saw_upload_part) {
+                    request_->setPendingBodyBytes(reader.remainingBytesOnSocket());
                     WebUpload aborted{};
                     aborted.status = WebUploadStatus::Aborted;
                     request_->setUpload(aborted);
@@ -724,8 +816,9 @@ void EspHttpServerBackend::begin() {
     config.global_user_ctx = this;
     config.global_user_ctx_free_fn = nullptr;
     config.uri_match_fn = nullptr;
-    // The default 5 s receive timeout is too aggressive for large OTA uploads
-    // over weaker Wi-Fi links and can abort the multipart body mid-transfer.
+    // Keep the per-recv timeout moderate and let the multipart reader own
+    // the longer no-progress budget so a single socket timeout does not
+    // immediately abort OTA.
     config.recv_wait_timeout = kHttpServerRecvWaitTimeoutS;
     config.send_wait_timeout = kHttpServerSendWaitTimeoutS;
 

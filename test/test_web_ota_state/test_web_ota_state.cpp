@@ -57,9 +57,12 @@ void test_web_ota_state_error_is_sticky_and_clears_active() {
 
     const WebOtaSnapshot snapshot = state.snapshot();
     TEST_ASSERT_FALSE(snapshot.active);
-    TEST_ASSERT_FALSE(state.isBusy());
+    TEST_ASSERT_TRUE(state.isBusy());
     TEST_ASSERT_FALSE(snapshot.success);
     TEST_ASSERT_EQUAL_STRING("first", snapshot.error.c_str());
+
+    state.reset();
+    TEST_ASSERT_FALSE(state.isBusy());
 }
 
 void test_web_ota_state_success_and_expected_size_match() {

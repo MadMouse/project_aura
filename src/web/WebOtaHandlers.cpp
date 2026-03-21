@@ -21,6 +21,8 @@ namespace {
 constexpr const char kApiErrorOtaBusyJson[] =
     "{\"success\":false,\"error\":\"OTA upload in progress\","
     "\"error_code\":\"OTA_BUSY\",\"ota_busy\":true}";
+constexpr size_t kOtaAbortDrainMaxBytes = 32UL * 1024UL;
+constexpr uint32_t kOtaAbortDrainTimeoutMs = 1500;
 
 void send_ota_busy_json(WebRequest &server) {
     WebResponseUtils::sendNoStoreHeaders(server);
@@ -275,7 +277,7 @@ void handleUpdate(Runtime &runtime, bool ota_busy) {
 
     WebRequest &server = *runtime.context.server;
     const WebOtaSnapshot ota = runtime.ota_state.snapshot();
-    if (ota_busy && !ota.success) {
+    if (ota_busy && !ota.success && !ota.upload_seen) {
         send_ota_busy_json(server);
         return;
     }
@@ -295,7 +297,20 @@ void handleUpdate(Runtime &runtime, bool ota_busy) {
     String json;
     serializeJson(doc, json);
     WebResponseUtils::sendNoStoreHeaders(server);
+    if (!result.success) {
+        const size_t pending_body_bytes = server.pendingRequestBodyBytes();
+        if (pending_body_bytes > 0) {
+            const size_t drained =
+                server.drainPendingRequestBody(kOtaAbortDrainMaxBytes,
+                                               kOtaAbortDrainTimeoutMs);
+            LOGI("OTA", "drained %u/%u pending request bytes before failure response",
+                 static_cast<unsigned>(drained),
+                 static_cast<unsigned>(pending_body_bytes));
+        }
+    }
+    server.sendHeader("Connection", "close");
     server.send(result.status_code, "application/json", json);
+    server.stopClient();
 
     if (has_upload) {
         LOGI("OTA",

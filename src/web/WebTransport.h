@@ -38,6 +38,8 @@ public:
     virtual void send(int status_code, const char *content_type, const String &content) = 0;
     virtual void send(int status_code, const char *content_type, const char *content) = 0;
     virtual bool clientConnected() const = 0;
+    virtual size_t pendingRequestBodyBytes() const = 0;
+    virtual size_t drainPendingRequestBody(size_t max_bytes, uint32_t max_time_ms) = 0;
     virtual void stopClient() = 0;
     virtual bool beginStreamResponse(int status_code,
                                      const char *content_type,

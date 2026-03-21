@@ -129,7 +129,7 @@ void WebOtaState::setErrorOnce(const String &error) {
     }
     success_ = false;
     active_.store(false, std::memory_order_release);
-    busy_.store(false, std::memory_order_release);
+    busy_.store(true, std::memory_order_release);
 }
 
 WebOtaSnapshot WebOtaState::snapshot() const {

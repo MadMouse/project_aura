@@ -58,6 +58,8 @@ public:
     }
 
     bool clientConnected() const override { return connected_; }
+    size_t pendingRequestBodyBytes() const override { return 0; }
+    size_t drainPendingRequestBody(size_t, uint32_t) override { return 0; }
 
     void stopClient() override {
         stop_called_ = true;
