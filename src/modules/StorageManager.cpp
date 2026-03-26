@@ -561,6 +561,7 @@ bool StorageManager::loadConfig() {
     if (!time.isNull()) {
         readValue(time, "ntp_enabled", loaded.ntp_enabled);
         readString(time, "ntp_server", loaded.ntp_server);
+        readString(time, "tz_name", loaded.tz_name);
         readValue(time, "tz_idx", loaded.tz_index);
         readValue(time, "format_24h", loaded.time_format_24h);
         int rtc_mode_raw = static_cast<int>(Config::RtcMode::Auto);
@@ -657,6 +658,7 @@ bool StorageManager::saveConfigInternal() {
     ArduinoJson::JsonObject time = root["time"].to<ArduinoJson::JsonObject>();
     time["ntp_enabled"] = config_.ntp_enabled;
     time["ntp_server"] = config_.ntp_server;
+    time["tz_name"] = config_.tz_name;
     time["tz_idx"] = config_.tz_index;
     time["format_24h"] = config_.time_format_24h;
     time["rtc_mode"] = static_cast<uint8_t>(config_.rtc_mode);

@@ -163,12 +163,32 @@ void TimeManager::begin(StorageManager &storage) {
     ntp_enabled_pref_ = cfg.ntp_enabled;
     ntp_server_pref_ = trim_copy(cfg.ntp_server);
     ntp_enabled_ = ntp_enabled_pref_;
-    tz_index_ = cfg.tz_index;
     rtc_mode_ = Config::clampRtcMode(static_cast<int>(cfg.rtc_mode));
-    if (tz_index_ < 0) {
-        tz_index_ = findTimezoneIndex("Europe/London");
+    const bool had_stored_timezone = (cfg.tz_name.length() > 0) || (cfg.tz_index >= 0);
+
+    int resolved_tz_index = -1;
+    if (cfg.tz_name.length() > 0) {
+        const int named_index = findTimezoneIndex(cfg.tz_name.c_str());
+        if (named_index >= 0 &&
+            named_index < static_cast<int>(TIME_ZONE_COUNT) &&
+            strcmp(kTimeZones[named_index].name, cfg.tz_name.c_str()) == 0) {
+            resolved_tz_index = named_index;
+        }
     }
+    if (resolved_tz_index < 0 &&
+        cfg.tz_index >= 0 &&
+        cfg.tz_index < static_cast<int>(TIME_ZONE_COUNT)) {
+        resolved_tz_index = cfg.tz_index;
+    }
+    if (resolved_tz_index < 0) {
+        resolved_tz_index = findTimezoneIndex("Europe/London");
+    }
+
+    tz_index_ = resolved_tz_index;
     applyTimezone();
+    if (had_stored_timezone) {
+        persistTimezoneSelection();
+    }
 }
 
 bool TimeManager::initRtc() {
@@ -396,13 +416,7 @@ bool TimeManager::setTimezoneIndex(int index) {
     bool changed = (clamped != tz_index_);
     tz_index_ = clamped;
     applyTimezone();
-    if (storage_) {
-        storage_->config().tz_index = tz_index_;
-        if (!storage_->saveConfig(true)) {
-            storage_->requestSave();
-            LOGE("Time", "failed to persist timezone index");
-        }
-    }
+    persistTimezoneSelection();
     return changed;
 }
 
@@ -417,6 +431,28 @@ bool TimeManager::adjustTimezone(int delta) {
         next += count;
     }
     return setTimezoneIndex(next);
+}
+
+void TimeManager::persistTimezoneSelection() {
+    if (!storage_) {
+        return;
+    }
+    if (tz_index_ < 0 || tz_index_ >= static_cast<int>(TIME_ZONE_COUNT)) {
+        return;
+    }
+
+    Config::StoredConfig &cfg = storage_->config();
+    const char *tz_name = kTimeZones[tz_index_].name ? kTimeZones[tz_index_].name : "";
+    if (cfg.tz_index == tz_index_ && cfg.tz_name == tz_name) {
+        return;
+    }
+
+    cfg.tz_index = tz_index_;
+    cfg.tz_name = tz_name;
+    if (!storage_->saveConfig(true)) {
+        storage_->requestSave();
+        LOGE("Time", "failed to persist timezone selection");
+    }
 }
 
 const TimeZoneEntry &TimeManager::getTimezone() const {

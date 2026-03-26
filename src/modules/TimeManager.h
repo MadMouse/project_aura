@@ -75,6 +75,7 @@ private:
     };
 
     void applyTimezone();
+    void persistTimezoneSelection();
     static void buildFixedTzString(int offset_min, char *out, size_t len);
     time_t makeUtcEpoch(const tm &utc_tm);
     bool setSystemTime(time_t epoch);
