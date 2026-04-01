@@ -51,18 +51,15 @@ void UiController::update_pressure_graph_overlays(bool has_values,
     char min_buf[32];
     char now_buf[32];
     char max_buf[32];
-    const float min_display = pressure_to_display(min_pressure);
-    const float now_display = pressure_to_display(latest_pressure);
-    const float max_display = pressure_to_display(max_pressure);
     const char *unit = pressure_display_unit();
     if (pressure_display_uses_inhg()) {
-        snprintf(min_buf, sizeof(min_buf), "MIN %.2f %s", min_display, unit);
-        snprintf(now_buf, sizeof(now_buf), "NOW %.2f %s", now_display, unit);
-        snprintf(max_buf, sizeof(max_buf), "MAX %.2f %s", max_display, unit);
+        snprintf(min_buf, sizeof(min_buf), "MIN %.2f %s", min_pressure, unit);
+        snprintf(now_buf, sizeof(now_buf), "NOW %.2f %s", latest_pressure, unit);
+        snprintf(max_buf, sizeof(max_buf), "MAX %.2f %s", max_pressure, unit);
     } else {
-        snprintf(min_buf, sizeof(min_buf), "MIN %.1f %s", min_display, unit);
-        snprintf(now_buf, sizeof(now_buf), "NOW %.1f %s", now_display, unit);
-        snprintf(max_buf, sizeof(max_buf), "MAX %.1f %s", max_display, unit);
+        snprintf(min_buf, sizeof(min_buf), "MIN %.1f %s", min_pressure, unit);
+        snprintf(now_buf, sizeof(now_buf), "NOW %.1f %s", latest_pressure, unit);
+        snprintf(max_buf, sizeof(max_buf), "MAX %.1f %s", max_pressure, unit);
     }
     safe_label_set_text(pressure_graph_label_min_, min_buf);
     safe_label_set_text(pressure_graph_label_now_, now_buf);
@@ -100,27 +97,68 @@ void UiController::update_pressure_info_graph() {
         return;
     }
 
-    const GraphSeriesStats stats = populate_info_chart_series(objects.chart_pressure_info,
-                                                              series,
-                                                              points,
-                                                              static_cast<int>(ChartsHistory::METRIC_PRESSURE),
-                                                              10.0f,
-                                                              false);
+    GraphSeriesStats stats{};
+    stats.has_values = false;
+    stats.min_value = FLT_MAX;
+    stats.max_value = -FLT_MAX;
+    stats.latest_value = NAN;
+
+    const float point_scale = pressure_display_uses_inhg() ? 100.0f : 10.0f;
+    const uint16_t total_count = chartsHistory.count();
+    const uint16_t available = (total_count < points) ? total_count : points;
+    const uint16_t missing_prefix = points - available;
+    const uint16_t start_offset = total_count - available;
+
+    for (uint16_t i = 0; i < points; ++i) {
+        lv_coord_t point_value = LV_CHART_POINT_NONE;
+        if (i >= missing_prefix) {
+            const uint16_t offset = start_offset + (i - missing_prefix);
+            float raw_value = 0.0f;
+            bool valid = false;
+            if (chartsHistory.metricValueFromOldest(offset,
+                                                    ChartsHistory::METRIC_PRESSURE,
+                                                    raw_value,
+                                                    valid) &&
+                valid && isfinite(raw_value)) {
+                const float display_value = pressure_to_display(raw_value);
+                if (isfinite(display_value)) {
+                    if (!stats.has_values) {
+                        stats.min_value = display_value;
+                        stats.max_value = display_value;
+                        stats.has_values = true;
+                    } else {
+                        if (display_value < stats.min_value) {
+                            stats.min_value = display_value;
+                        }
+                        if (display_value > stats.max_value) {
+                            stats.max_value = display_value;
+                        }
+                    }
+                    stats.latest_value = display_value;
+                    point_value = static_cast<lv_coord_t>(lroundf(display_value * point_scale));
+                }
+            }
+        }
+        lv_chart_set_value_by_id(objects.chart_pressure_info, series, i, point_value);
+    }
+
     const bool has_values = stats.has_values;
     float min_p = stats.min_value;
     float max_p = stats.max_value;
     float latest_p = stats.latest_value;
 
-    float scale_min = has_values ? min_p : 1013.0f;
-    float scale_max = has_values ? max_p : 1013.0f;
+    const float fallback_pressure = pressure_to_display(1013.0f);
+    float scale_min = has_values ? min_p : fallback_pressure;
+    float scale_max = has_values ? max_p : fallback_pressure;
     float scale_span = scale_max - scale_min;
-    if (!isfinite(scale_span) || scale_span < 2.0f) {
-        scale_span = 2.0f;
+    const float min_span = pressure_display_uses_inhg() ? 0.06f : 2.0f;
+    if (!isfinite(scale_span) || scale_span < min_span) {
+        scale_span = min_span;
     }
 
     float step = graph_nice_step(scale_span / 4.0f);
     if (!isfinite(step) || step <= 0.0f) {
-        step = 0.5f;
+        step = pressure_display_uses_inhg() ? 0.02f : 0.5f;
     }
 
     float y_min_f = floorf((scale_min - (step * 0.9f)) / step) * step;
@@ -130,15 +168,16 @@ void UiController::update_pressure_info_graph() {
         y_max_f += step;
     }
     if (!isfinite(y_min_f) || !isfinite(y_max_f) || y_max_f <= y_min_f) {
-        const float center = isfinite(latest_p) ? latest_p : 1013.0f;
-        y_min_f = center - 2.0f;
-        y_max_f = center + 2.0f;
+        const float center = isfinite(latest_p) ? latest_p : fallback_pressure;
+        y_min_f = center - min_span;
+        y_max_f = center + min_span;
     }
 
-    lv_coord_t y_min = static_cast<lv_coord_t>(floorf(y_min_f * 10.0f));
-    lv_coord_t y_max = static_cast<lv_coord_t>(ceilf(y_max_f * 10.0f));
+    lv_coord_t y_min = static_cast<lv_coord_t>(floorf(y_min_f * point_scale));
+    lv_coord_t y_max = static_cast<lv_coord_t>(ceilf(y_max_f * point_scale));
     if (y_max <= y_min) {
-        y_max = static_cast<lv_coord_t>(y_min + 10);
+        const lv_coord_t scaled_step = static_cast<lv_coord_t>(lroundf(step * point_scale));
+        y_max = static_cast<lv_coord_t>(y_min + (scaled_step > 0 ? scaled_step : 1));
     }
 
     int32_t horizontal_divisions = static_cast<int32_t>(lroundf((y_max_f - y_min_f) / step));
@@ -160,7 +199,7 @@ void UiController::update_pressure_info_graph() {
         }
         update_pressure_graph_overlays(true, min_p, max_p, latest_p);
     } else {
-        update_pressure_graph_overlays(false, 1013.0f, 1013.0f, 1013.0f);
+        update_pressure_graph_overlays(false, fallback_pressure, fallback_pressure, fallback_pressure);
     }
     update_pressure_time_labels();
 

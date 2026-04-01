@@ -817,11 +817,39 @@ function isUsUnitSystem(tempUnit) { return tempUnit === 'f'; }
 function tempToDisplay(tempC, tempUnit) {
   return isUsUnitSystem(tempUnit) ? (tempC * 9 / 5) + 32 : tempC;
 }
+function pressureAltitudeConfigured() {
+  return settings.pressureAltitudeSet === true && isNum(settings.pressureAltitudeM);
+}
+function pressureAbsoluteToMslHpa(pressureHpa, altitudeM) {
+  if (!isNum(pressureHpa)) return pressureHpa;
+  if (!isNum(altitudeM)) return pressureHpa;
+  const base = 1 - (altitudeM / 44330.0);
+  if (!Number.isFinite(base) || base <= 0) return pressureHpa;
+  const corrected = pressureHpa / Math.pow(base, 5.255);
+  return Number.isFinite(corrected) ? corrected : pressureHpa;
+}
+function pressureLabelText() {
+  return pressureAltitudeConfigured() ? 'MSL Pressure' : 'Pressure';
+}
 function pressureToDisplay(pressureHpa, tempUnit) {
+  const sourceHpa = pressureAltitudeConfigured()
+    ? pressureAbsoluteToMslHpa(pressureHpa, settings.pressureAltitudeM)
+    : pressureHpa;
+  if (!isNum(sourceHpa)) return sourceHpa;
+  return isUsUnitSystem(tempUnit) ? (sourceHpa * 0.0295299830714) : sourceHpa;
+}
+function pressureAbsoluteToDisplay(pressureHpa, tempUnit) {
+  if (!isNum(pressureHpa)) return pressureHpa;
   return isUsUnitSystem(tempUnit) ? (pressureHpa * 0.0295299830714) : pressureHpa;
 }
+function pressureDeltaToMslHpa(deltaHpa) {
+  return pressureAltitudeConfigured()
+    ? pressureAbsoluteToMslHpa(deltaHpa, settings.pressureAltitudeM)
+    : deltaHpa;
+}
 function pressureDeltaToDisplay(deltaHpa, tempUnit) {
-  return isUsUnitSystem(tempUnit) ? (deltaHpa * 0.0295299830714) : deltaHpa;
+  const sourceHpa = pressureDeltaToMslHpa(deltaHpa);
+  return isUsUnitSystem(tempUnit) ? (sourceHpa * 0.0295299830714) : sourceHpa;
 }
 function temperatureUnitLabel(tempUnit) {
   return isUsUnitSystem(tempUnit) ? '\u00B0F' : '\u00B0C';
@@ -865,7 +893,7 @@ function trendToken(delta, is24h) {
   if (!isNum(delta)) {
     return { textStyle:'color:'+fallbackColor, surfaceStyle:'color:'+fallbackColor+';border-color:rgba(156,163,175,.32);background:rgba(75,85,99,.2)' };
   }
-  const absDelta = Math.abs(delta);
+  const absDelta = Math.abs(pressureDeltaToMslHpa(delta));
   const status = getStatus(absDelta, is24h ? thresholds.pressureDelta24h : thresholds.pressureDelta3h);
   const color = statusColorOf(status);
   return {
@@ -1103,6 +1131,7 @@ function renderClimateOverview(sensors, derived) {
   const tempUnitText = temperatureUnitLabel(settings.tempUnit);
   const pressureUnitText = pressureUnitLabel(settings.tempUnit);
   const pressureValueDigits = pressureDigits(settings.tempUnit);
+  const pressureLabel = pressureLabelText();
 
   document.getElementById('climateOverview').innerHTML =
     `<div class="climate-wrap">
@@ -1152,7 +1181,7 @@ function renderClimateOverview(sensors, derived) {
       <div class="pressure-mini mini-card" style="margin-top:10px;">
         <div class="pressure-row">
           <div>
-            <div class="mini-label">Pressure</div>
+            <div class="mini-label">${pressureLabel}</div>
             <div class="mini-val-row">
               <span class="mini-val" style="font-size:22px;color:#f9fafb">${fmtVal(pressureDisplay,pressureValueDigits)}</span>
               <span class="mini-unit">${pressureUnitText}</span>
@@ -1393,9 +1422,14 @@ function renderCharts(payload) {
 
   const layout = CHART_LAYOUTS[chartGroup] || CHART_LAYOUTS.core;
   el.innerHTML = layout.map(card => {
+    const pressureCard = card.lines.some(line => line.key === 'pressure');
+    const cardTitle = pressureCard ? pressureLabelText() : card.title;
     const lineKeys = card.lines.map(line => line.key);
     const lineColors = card.lines.map(line => line.color || '#3dd6c6');
-    const lineNames = card.lines.map(line => line.name || line.key.toUpperCase());
+    const lineNames = card.lines.map(line => {
+      if (line.key === 'pressure') return pressureLabelText();
+      return line.name || line.key.toUpperCase();
+    });
     const lineUnits = card.lines.map(line => {
       if (line.key === 'temperature') return temperatureUnitLabel(settings.tempUnit);
       if (line.key === 'pressure') return pressureUnitLabel(settings.tempUnit);
@@ -1435,7 +1469,7 @@ function renderCharts(payload) {
 
     return `<div class="card-g7 chart-box">
       <div class="chart-head">
-        <span class="chart-name">${esc(card.title)}</span>
+        <span class="chart-name">${esc(cardTitle)}</span>
         <div class="chart-latest-row">
           ${latestItems.map(item =>
             `<span class="chart-latest-item" style="color:${item.color}">${isNum(item.value) ? Number(item.value).toFixed(item.digits) : '-'}</span>`
@@ -1573,6 +1607,8 @@ const settings = {
   tempUnit: 'c',
   timeFormat24h: true,
   tempOffset: 0, humOffset: 0,
+  pressureAltitudeSet: false,
+  pressureAltitudeM: 0,
   displayName: '',
 };
 const savedSettings = Object.assign({}, settings);
@@ -2249,6 +2285,8 @@ function applySettingsToUI(apiSettings, force, toggleOverrideKey) {
   if (settingsSaveStatus === 'dirty' && !force) return;
   const prevTempUnit = settings.tempUnit;
   const prevTimeFormat24h = settings.timeFormat24h;
+  const prevPressureAltitudeSet = settings.pressureAltitudeSet;
+  const prevPressureAltitudeM = settings.pressureAltitudeM;
 
   if (typeof apiSettings.night_mode === 'boolean' &&
       shouldApplyToggleFromApi('night_mode', toggleOverrideKey)) {
@@ -2267,6 +2305,8 @@ function applySettingsToUI(apiSettings, force, toggleOverrideKey) {
   if (typeof apiSettings.time_format_24h === 'boolean') settings.timeFormat24h = apiSettings.time_format_24h;
   if (isNum(apiSettings.temp_offset)) settings.tempOffset = Number(apiSettings.temp_offset.toFixed(1));
   if (isNum(apiSettings.hum_offset)) settings.humOffset = Number(apiSettings.hum_offset.toFixed(0));
+  if (typeof apiSettings.pressure_altitude_set === 'boolean') settings.pressureAltitudeSet = apiSettings.pressure_altitude_set;
+  if (isNum(apiSettings.pressure_altitude_m)) settings.pressureAltitudeM = Math.round(apiSettings.pressure_altitude_m);
   if (typeof apiSettings.display_name === 'string') settings.displayName = apiSettings.display_name;
 
   updateToggleDom('nightModeSw', settings.nightMode);
@@ -2279,6 +2319,11 @@ function applySettingsToUI(apiSettings, force, toggleOverrideKey) {
   updateTempOffsetDisplay();
   updateHumOffsetDisplay();
   if (prevTempUnit !== settings.tempUnit) {
+    rerenderUnitDependentViews();
+  } else if (
+    prevPressureAltitudeSet !== settings.pressureAltitudeSet ||
+    prevPressureAltitudeM !== settings.pressureAltitudeM
+  ) {
     rerenderUnitDependentViews();
   } else if (prevTimeFormat24h !== settings.timeFormat24h) {
     updateHeaderClock();

@@ -645,12 +645,13 @@ void UiController::sync_info_graph_button_state() {
     const bool pm25_4_selected = (info_sensor == INFO_PM25) || (info_sensor == INFO_PM4);
     const bool pm1_10_selected = (info_sensor == INFO_PM1) || (info_sensor == INFO_PM10);
     const bool pressure_selected = (info_sensor == INFO_PRESSURE_3H) || (info_sensor == INFO_PRESSURE_24H);
+    const bool pressure_graph_available = !pressure_selected || pressure_altitude_is_set();
     const bool graph_supported = (info_sensor == INFO_TEMP) || (info_sensor == INFO_RH) ||
                                  voc_selected || nox_selected || hcho_selected || co2_selected ||
                                  pm05_selected ||
                                  pm25_4_selected ||
                                  pm1_10_selected ||
-                                 co_selected || pressure_selected;
+                                 co_selected || (pressure_selected && pressure_graph_available);
     const bool graph_checked =
         ((info_sensor == INFO_TEMP) && temp_graph_mode_) ||
         ((info_sensor == INFO_RH) && rh_graph_mode_) ||

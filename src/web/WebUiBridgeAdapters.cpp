@@ -19,6 +19,8 @@ WebSettingsUtils::SettingsSnapshot captureSettingsSnapshot(const WebUiBridge::Sn
     result.time_format_24h = snapshot.time_format_24h;
     result.temp_offset = snapshot.temp_offset;
     result.hum_offset = snapshot.hum_offset;
+    result.pressure_altitude_set = snapshot.pressure_altitude_set;
+    result.pressure_altitude_m = snapshot.pressure_altitude_m;
     result.ntp_server = snapshot.ntp_server;
     result.display_name = snapshot.display_name;
     return result;

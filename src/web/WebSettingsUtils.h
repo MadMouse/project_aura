@@ -24,6 +24,8 @@ struct SettingsSnapshot {
     bool time_format_24h = true;
     float temp_offset = 0.0f;
     float hum_offset = 0.0f;
+    bool pressure_altitude_set = false;
+    int16_t pressure_altitude_m = 0;
     String ntp_server;
     String display_name;
 };

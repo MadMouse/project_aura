@@ -396,6 +396,8 @@ WebUiBridge::Snapshot UiController::buildWebUiSnapshot() const {
     snapshot.time_format_24h = time_format_24h_;
     snapshot.temp_offset = temp_offset;
     snapshot.hum_offset = hum_offset;
+    snapshot.pressure_altitude_set = storage.config().pressure_altitude_set;
+    snapshot.pressure_altitude_m = storage.config().pressure_altitude_m;
     snapshot.ntp_last_sync_ms = timeManager.lastNtpSyncMs();
     snapshot.ntp_server = timeManager.ntpServerPref();
     snapshot.display_name = storage.config().web_display_name;
@@ -1708,7 +1710,35 @@ void UiController::apply_toggle_style(lv_obj_t *btn) {
     lv_obj_set_style_shadow_color(btn, color_green(), LV_PART_MAIN | LV_STATE_CHECKED);
 }
 
-float UiController::pressure_to_display(float pressure_hpa) const {
+bool UiController::pressure_altitude_is_set() const {
+    return storage.config().pressure_altitude_set;
+}
+
+int UiController::pressure_altitude_meters() const {
+    return storage.config().pressure_altitude_m;
+}
+
+float UiController::pressure_absolute_to_msl_hpa(float pressure_hpa, int altitude_m) const {
+    if (!isfinite(pressure_hpa)) {
+        return pressure_hpa;
+    }
+    const float altitude = static_cast<float>(altitude_m);
+    const float base = 1.0f - (altitude / 44330.0f);
+    if (!isfinite(base) || base <= 0.0f) {
+        return pressure_hpa;
+    }
+    const float corrected = pressure_hpa / powf(base, 5.255f);
+    return isfinite(corrected) ? corrected : pressure_hpa;
+}
+
+float UiController::pressure_delta_to_msl_hpa(float pressure_delta_hpa) const {
+    if (!pressure_altitude_is_set()) {
+        return pressure_delta_hpa;
+    }
+    return pressure_absolute_to_msl_hpa(pressure_delta_hpa, pressure_altitude_meters());
+}
+
+float UiController::pressure_hpa_to_display_units(float pressure_hpa) const {
     if (!isfinite(pressure_hpa)) {
         return pressure_hpa;
     }
@@ -1719,19 +1749,153 @@ float UiController::pressure_to_display(float pressure_hpa) const {
     return pressure_hpa * kHpaToInHg;
 }
 
+float UiController::pressure_to_display(float pressure_hpa) const {
+    if (pressure_altitude_is_set()) {
+        pressure_hpa = pressure_absolute_to_msl_hpa(pressure_hpa, pressure_altitude_meters());
+    }
+    return pressure_hpa_to_display_units(pressure_hpa);
+}
+
 float UiController::pressure_delta_to_display(float pressure_delta_hpa) const {
-    if (!isfinite(pressure_delta_hpa)) {
-        return pressure_delta_hpa;
-    }
-    if (!pressure_display_uses_inhg()) {
-        return pressure_delta_hpa;
-    }
-    constexpr float kHpaToInHg = 0.0295299830714f;
-    return pressure_delta_hpa * kHpaToInHg;
+    pressure_delta_hpa = pressure_delta_to_msl_hpa(pressure_delta_hpa);
+    return pressure_hpa_to_display_units(pressure_delta_hpa);
 }
 
 const char *UiController::pressure_display_unit() const {
     return pressure_display_uses_inhg() ? "inHg" : "hPa";
+}
+
+void UiController::reset_pressure_altitude_pending() {
+    pressure_altitude_pending_m_ =
+        constrain(static_cast<int>(storage.config().pressure_altitude_m),
+                  static_cast<int>(Config::PRESSURE_ALTITUDE_MIN_M),
+                  static_cast<int>(Config::PRESSURE_ALTITUDE_MAX_M));
+}
+
+void UiController::style_accent_button(lv_obj_t *btn, lv_obj_t *label, lv_color_t accent) {
+    if (!btn) {
+        return;
+    }
+    const lv_color_t bg = lv_color_mix(accent, lv_color_black(), 84);
+    const lv_color_t bg_grad = lv_color_mix(accent, lv_color_black(), 44);
+    lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_color(btn, bg, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_grad_color(btn, bg_grad, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_grad_dir(btn, LV_GRAD_DIR_VER, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_border_color(btn, accent, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_shadow_color(btn, accent, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_shadow_opa(btn, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
+    if (label) {
+        lv_obj_set_style_text_color(label, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
+    }
+}
+
+void UiController::update_pressure_altitude_preview() {
+    char buf[20];
+    snprintf(buf, sizeof(buf), "%dm", pressure_altitude_pending_m_);
+    safe_label_set_text(objects.altitude_value_meters, buf);
+
+    constexpr float kMetersToFeet = 3.28084f;
+    const long altitude_ft = lroundf(static_cast<float>(pressure_altitude_pending_m_) * kMetersToFeet);
+    snprintf(buf, sizeof(buf), "%ldft", altitude_ft);
+    safe_label_set_text(objects.altitude_value_ft, buf);
+
+    const char *unit = pressure_display_unit();
+    safe_label_set_text(objects.abs_pressure_unit, unit);
+    safe_label_set_text(objects.msl_pressure_unit, unit);
+
+    if (!currentData.pressure_valid || !isfinite(currentData.pressure)) {
+        safe_label_set_text_static(objects.abs_pressure_value, UiText::ValueMissing());
+        safe_label_set_text_static(objects.msl_pressure_value, UiText::ValueMissing());
+        return;
+    }
+
+    const float abs_display = pressure_hpa_to_display_units(currentData.pressure);
+    const float msl_hpa =
+        pressure_absolute_to_msl_hpa(currentData.pressure, pressure_altitude_pending_m_);
+    const float msl_display = pressure_hpa_to_display_units(msl_hpa);
+    const char *format = pressure_display_uses_inhg() ? "%.1f" : "%.0f";
+
+    snprintf(buf, sizeof(buf), format, abs_display);
+    safe_label_set_text(objects.abs_pressure_value, buf);
+    snprintf(buf, sizeof(buf), format, msl_display);
+    safe_label_set_text(objects.msl_pressure_value, buf);
+}
+
+void UiController::sync_pressure_altitude_ui() {
+    const bool pressure_selected =
+        (info_sensor == INFO_PRESSURE_3H) || (info_sensor == INFO_PRESSURE_24H);
+    const bool overlay_visible = pressure_selected && pressure_altitude_overlay_open_;
+
+    set_visible(objects.container_set_altitude, overlay_visible);
+    set_visible(objects.btn_set_altitude, pressure_selected && !overlay_visible);
+
+    if (pressure_selected && !overlay_visible) {
+        style_accent_button(objects.btn_set_altitude,
+                            objects.label_btn_set_altitude,
+                            pressure_altitude_is_set() ? color_green() : color_yellow());
+    }
+
+    if (!pressure_selected) {
+        pressure_altitude_overlay_open_ = false;
+        set_visible(objects.label_sensor_info_title, true);
+        set_visible(objects.label_sensor_value, true);
+        set_visible(objects.dot_sensor_info, true);
+        set_visible(objects.label_sensor_info_unit, true);
+        return;
+    }
+
+    const bool header_visible = !overlay_visible;
+    set_visible(objects.label_sensor_info_title, header_visible);
+    set_visible(objects.label_sensor_value, header_visible);
+    set_visible(objects.dot_sensor_info, header_visible);
+    set_visible(objects.label_sensor_info_unit, header_visible);
+    set_visible(objects.pressure_info, !overlay_visible);
+    set_visible(objects.container_thresholds_dots, !overlay_visible && should_show_threshold_dots());
+
+    if (overlay_visible) {
+        set_visible(objects.btn_info_graph, false);
+        update_pressure_altitude_preview();
+        if (objects.container_set_altitude) {
+            lv_obj_move_foreground(objects.container_set_altitude);
+        }
+        if (objects.btn_back_1) {
+            lv_obj_move_foreground(objects.btn_back_1);
+        }
+        return;
+    }
+
+    set_pressure_info_mode(pressure_graph_mode_);
+}
+
+void UiController::set_pressure_altitude_overlay_visible(bool visible) {
+    pressure_altitude_overlay_open_ = visible;
+    if (visible) {
+        reset_pressure_altitude_pending();
+    }
+    update_sensor_info_ui();
+}
+
+void UiController::nudge_pressure_altitude(int delta_m) {
+    pressure_altitude_pending_m_ =
+        constrain(pressure_altitude_pending_m_ + delta_m,
+                  static_cast<int>(Config::PRESSURE_ALTITUDE_MIN_M),
+                  static_cast<int>(Config::PRESSURE_ALTITUDE_MAX_M));
+    update_pressure_altitude_preview();
+}
+
+void UiController::apply_pressure_altitude_setting() {
+    storage.config().pressure_altitude_m = pressure_altitude_pending_m_;
+    storage.config().pressure_altitude_set = true;
+    if (!storage.saveConfig(true)) {
+        storage.requestSave();
+        LOGE("UI", "failed to persist pressure altitude");
+    }
+    pressure_altitude_overlay_open_ = false;
+    data_dirty = true;
+    invalidate_active_graph_refresh_cache();
+    update_ui();
+    update_sensor_info_ui();
 }
 
 void UiController::update_clock_labels() {
@@ -2554,6 +2718,12 @@ void UiController::init_ui_defaults() {
     time_format_24h_ = storage.config().time_format_24h;
     rtc_detection_saved_mode_ = storage.config().rtc_mode;
     rtc_detection_pending_mode_ = rtc_detection_saved_mode_;
+    storage.config().pressure_altitude_m =
+        constrain(static_cast<int>(storage.config().pressure_altitude_m),
+                  static_cast<int>(Config::PRESSURE_ALTITUDE_MIN_M),
+                  static_cast<int>(Config::PRESSURE_ALTITUDE_MAX_M));
+    reset_pressure_altitude_pending();
+    pressure_altitude_overlay_open_ = false;
     const bool expected_units_mdy = !temp_units_c;
     if (date_units_mdy != expected_units_mdy) {
         date_units_mdy = expected_units_mdy;

@@ -65,6 +65,7 @@ void UiController::update_main_texts() {
     if (objects.label_btn_settings_1) safe_label_set_text(objects.label_btn_settings_1, UiText::LabelSettingsButton());
     if (objects.label_temp_title_1) safe_label_set_text(objects.label_temp_title_1, UiText::LabelTemperatureTitle());
     if (objects.label_pressure_title_1) safe_label_set_text(objects.label_pressure_title_1, UiText::LabelPressureTitle());
+    if (objects.label_pressure_set_altitude) safe_label_set_text(objects.label_pressure_set_altitude, UiText::LabelPressureSetAltitude());
     if (objects.label_time_title_2) safe_label_set_text(objects.label_time_title_2, UiText::LabelTimeCard());
     if (objects.label_voc_warmup_1) safe_label_set_text(objects.label_voc_warmup_1, UiText::LabelWarmup());
     if (objects.label_nox_warmup_1) safe_label_set_text(objects.label_nox_warmup_1, UiText::LabelWarmup());
@@ -75,6 +76,13 @@ void UiController::update_main_texts() {
 
 void UiController::update_sensor_info_texts() {
     if (objects.label_btn_back_1) safe_label_set_text_static(objects.label_btn_back_1, UiText::LabelSettingsBack());
+    if (objects.label_btn_set_altitude) safe_label_set_text_static(objects.label_btn_set_altitude, UiText::LabelSetAltitudeButton());
+    if (objects.set_altitude_title_1) safe_label_set_text_static(objects.set_altitude_title_1, UiText::LabelMslPressureInfo());
+    if (objects.set_altitude_title_2) safe_label_set_text_static(objects.set_altitude_title_2, UiText::LabelAltitudeAboveSeaLevel());
+    if (objects.set_altitude_title_3) safe_label_set_text_static(objects.set_altitude_title_3, UiText::LabelMslPressureFootnote());
+    if (objects.abs_pressure_title) safe_label_set_text_static(objects.abs_pressure_title, UiText::LabelAbsPressureTitle());
+    if (objects.msl_pressure_title) safe_label_set_text_static(objects.msl_pressure_title, UiText::LabelMslPressureTitle());
+    if (objects.label_btn_altitude_apply) safe_label_set_text_static(objects.label_btn_altitude_apply, UiText::LabelApplyButton());
     if (objects.label_temperature_text) safe_label_set_text_static(objects.label_temperature_text, UiText::InfoTempText());
     if (objects.label_temperature_excellent) safe_label_set_text_static(objects.label_temperature_excellent, UiText::InfoTempExcellent());
     if (objects.label_temperature_acceptable) safe_label_set_text_static(objects.label_temperature_acceptable, UiText::InfoTempAcceptable());

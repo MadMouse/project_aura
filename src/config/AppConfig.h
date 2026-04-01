@@ -403,6 +403,9 @@ namespace Config {
         (PRESSURE_HISTORY_STEP_MS / 1000UL) * PRESSURE_HISTORY_24H_SAMPLES;
     constexpr uint32_t PRESSURE_HISTORY_FILL_SHORT_S = 15UL * 60UL;
     constexpr uint32_t PRESSURE_HISTORY_FILL_LONG_S = 4UL * 60UL * 60UL;
+    constexpr int16_t PRESSURE_ALTITUDE_MIN_M = -500;
+    constexpr int16_t PRESSURE_ALTITUDE_MAX_M = 5000;
+    constexpr int16_t PRESSURE_ALTITUDE_DEFAULT_M = 0;
     constexpr size_t THEME_SWATCH_COUNT = 12;
 
     constexpr float BASE_TEMP_OFFSET = 2.4f;
@@ -453,6 +456,8 @@ namespace Config {
         bool led_indicators = true;
         bool alert_blink = true;
         bool asc_enabled = true;
+        bool pressure_altitude_set = false;
+        int16_t pressure_altitude_m = 0;
         String web_display_name = "";
         Language language = Language::EN;
 

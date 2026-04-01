@@ -212,6 +212,14 @@ void UiController::on_card_pressure_event_cb(lv_event_t *e) { if (instance_) ins
 void UiController::on_pressure_3h_info_event_cb(lv_event_t *e) { if (instance_) instance_->on_pressure_3h_info_event(e); }
 void UiController::on_pressure_24h_info_event_cb(lv_event_t *e) { if (instance_) instance_->on_pressure_24h_info_event(e); }
 void UiController::on_sensors_info_back_event_cb(lv_event_t *e) { if (instance_) instance_->on_sensors_info_back_event(e); }
+void UiController::on_set_altitude_event_cb(lv_event_t *e) { if (instance_) instance_->on_set_altitude_event(e); }
+void UiController::on_altitude_plus_100_event_cb(lv_event_t *e) { if (instance_) instance_->on_altitude_plus_100_event(e); }
+void UiController::on_altitude_plus_10_event_cb(lv_event_t *e) { if (instance_) instance_->on_altitude_plus_10_event(e); }
+void UiController::on_altitude_plus_1_event_cb(lv_event_t *e) { if (instance_) instance_->on_altitude_plus_1_event(e); }
+void UiController::on_altitude_minus_1_event_cb(lv_event_t *e) { if (instance_) instance_->on_altitude_minus_1_event(e); }
+void UiController::on_altitude_minus_10_event_cb(lv_event_t *e) { if (instance_) instance_->on_altitude_minus_10_event(e); }
+void UiController::on_altitude_minus_100_event_cb(lv_event_t *e) { if (instance_) instance_->on_altitude_minus_100_event(e); }
+void UiController::on_altitude_apply_event_cb(lv_event_t *e) { if (instance_) instance_->on_altitude_apply_event(e); }
 void UiController::on_temp_offset_minus_cb(lv_event_t *e) { if (instance_) instance_->on_temp_offset_minus(e); }
 void UiController::on_temp_offset_plus_cb(lv_event_t *e) { if (instance_) instance_->on_temp_offset_plus(e); }
 void UiController::on_hum_offset_minus_cb(lv_event_t *e) { if (instance_) instance_->on_hum_offset_minus(e); }
@@ -1537,6 +1545,7 @@ void UiController::on_card_pressure_event(lv_event_t *e) {
     if (lv_event_get_code(e) != LV_EVENT_CLICKED) {
         return;
     }
+    pressure_altitude_overlay_open_ = false;
     select_pressure_info(INFO_PRESSURE_3H);
     pending_screen_id = SCREEN_ID_PAGE_SENSORS_INFO;
 }
@@ -1559,9 +1568,72 @@ void UiController::on_sensors_info_back_event(lv_event_t *e) {
     if (lv_event_get_code(e) != LV_EVENT_CLICKED) {
         return;
     }
+    if (pressure_altitude_overlay_open_) {
+        pressure_altitude_overlay_open_ = false;
+        reset_pressure_altitude_pending();
+        update_sensor_info_ui();
+        return;
+    }
     info_sensor = INFO_NONE;
+    pressure_altitude_overlay_open_ = false;
     hide_all_sensor_info_containers();
     pending_screen_id = SCREEN_ID_PAGE_MAIN_PRO;
+}
+
+void UiController::on_set_altitude_event(lv_event_t *e) {
+    if (lv_event_get_code(e) != LV_EVENT_CLICKED) {
+        return;
+    }
+    set_pressure_altitude_overlay_visible(true);
+}
+
+void UiController::on_altitude_plus_100_event(lv_event_t *e) {
+    if (lv_event_get_code(e) != LV_EVENT_CLICKED) {
+        return;
+    }
+    nudge_pressure_altitude(100);
+}
+
+void UiController::on_altitude_plus_10_event(lv_event_t *e) {
+    if (lv_event_get_code(e) != LV_EVENT_CLICKED) {
+        return;
+    }
+    nudge_pressure_altitude(10);
+}
+
+void UiController::on_altitude_plus_1_event(lv_event_t *e) {
+    if (lv_event_get_code(e) != LV_EVENT_CLICKED) {
+        return;
+    }
+    nudge_pressure_altitude(1);
+}
+
+void UiController::on_altitude_minus_1_event(lv_event_t *e) {
+    if (lv_event_get_code(e) != LV_EVENT_CLICKED) {
+        return;
+    }
+    nudge_pressure_altitude(-1);
+}
+
+void UiController::on_altitude_minus_10_event(lv_event_t *e) {
+    if (lv_event_get_code(e) != LV_EVENT_CLICKED) {
+        return;
+    }
+    nudge_pressure_altitude(-10);
+}
+
+void UiController::on_altitude_minus_100_event(lv_event_t *e) {
+    if (lv_event_get_code(e) != LV_EVENT_CLICKED) {
+        return;
+    }
+    nudge_pressure_altitude(-100);
+}
+
+void UiController::on_altitude_apply_event(lv_event_t *e) {
+    if (lv_event_get_code(e) != LV_EVENT_CLICKED) {
+        return;
+    }
+    apply_pressure_altitude_setting();
 }
 
 void UiController::on_led_indicators_event(lv_event_t *e) {

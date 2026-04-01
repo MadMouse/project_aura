@@ -390,7 +390,9 @@ void UiController::update_sensor_cards(const AirQuality &aq, bool gas_warmup, bo
         lv_obj_set_style_shadow_opa(objects.line_2, LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
     }
 
-    if (currentData.pressure_valid) {
+    const bool pressure_prompt_altitude =
+        currentData.pressure_valid && !pressure_altitude_is_set();
+    if (currentData.pressure_valid && !pressure_prompt_altitude) {
         const float pressure_display = pressure_to_display(currentData.pressure);
         if (pressure_display_uses_inhg()) {
             snprintf(buf, sizeof(buf), "%.1f", pressure_display);
@@ -404,6 +406,9 @@ void UiController::update_sensor_cards(const AirQuality &aq, bool gas_warmup, bo
     if (objects.label_pressure_unit_1) {
         safe_label_set_text_static(objects.label_pressure_unit_1, pressure_display_unit());
     }
+    set_visible(objects.label_pressure_value_1, !pressure_prompt_altitude);
+    set_visible(objects.label_pressure_unit_1, !pressure_prompt_altitude);
+    set_visible(objects.label_pressure_set_altitude, pressure_prompt_altitude);
 
     if (currentData.pressure_delta_3h_valid) {
         const float delta_display = pressure_delta_to_display(currentData.pressure_delta_3h);
@@ -453,10 +458,14 @@ void UiController::update_sensor_cards(const AirQuality &aq, bool gas_warmup, bo
 
     lv_color_t delta_3h_color = night_mode
         ? color_card_border()
-        : getPressureDeltaColor(currentData.pressure_delta_3h, currentData.pressure_delta_3h_valid, false);
+        : getPressureDeltaColor(pressure_delta_to_msl_hpa(currentData.pressure_delta_3h),
+                                currentData.pressure_delta_3h_valid,
+                                false);
     lv_color_t delta_24h_color = night_mode
         ? color_card_border()
-        : getPressureDeltaColor(currentData.pressure_delta_24h, currentData.pressure_delta_24h_valid, true);
+        : getPressureDeltaColor(pressure_delta_to_msl_hpa(currentData.pressure_delta_24h),
+                                currentData.pressure_delta_24h_valid,
+                                true);
     set_chip_color(objects.chip_delta_4, delta_3h_color);
     set_chip_color(objects.chip_delta_25, delta_24h_color);
     set_chip_color(objects.chip_delta_4, delta_3h_color);

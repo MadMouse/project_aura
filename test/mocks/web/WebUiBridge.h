@@ -22,6 +22,8 @@ public:
         bool time_format_24h = true;
         float temp_offset = 0.0f;
         float hum_offset = 0.0f;
+        bool pressure_altitude_set = false;
+        int16_t pressure_altitude_m = 0;
         uint32_t ntp_last_sync_ms = 0;
         String ntp_server;
         String display_name;

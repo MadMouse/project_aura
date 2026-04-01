@@ -408,7 +408,11 @@ void UiController::update_sensor_info_ui() {
         case INFO_PRESSURE_3H:
         case INFO_PRESSURE_24H: {
             char buf[16];
-            if (currentData.pressure_valid) {
+            const bool pressure_value_available =
+                currentData.pressure_valid && pressure_altitude_is_set();
+            const bool pressure_prompt_altitude =
+                currentData.pressure_valid && !pressure_altitude_is_set();
+            if (pressure_value_available) {
                 const float pressure_display = pressure_to_display(currentData.pressure);
                 if (pressure_display_uses_inhg()) {
                     snprintf(buf, sizeof(buf), "%.1f", pressure_display);
@@ -420,12 +424,15 @@ void UiController::update_sensor_info_ui() {
             }
             safe_label_set_text(objects.label_sensor_value, buf);
             safe_label_set_text(objects.label_pressure_value_1, buf);
+            set_visible(objects.label_pressure_value_1, !pressure_prompt_altitude);
+            set_visible(objects.label_pressure_unit_1, !pressure_prompt_altitude);
+            set_visible(objects.label_pressure_set_altitude, pressure_prompt_altitude);
 
             const char *unit = pressure_display_unit();
             if (objects.label_pressure_unit_1) {
                 safe_label_set_text_static(objects.label_pressure_unit_1, unit);
             }
-            safe_label_set_text(objects.label_sensor_info_unit, unit);
+            safe_label_set_text(objects.label_sensor_info_unit, pressure_value_available ? unit : "");
 
             if (currentData.pressure_delta_3h_valid) {
                 const float delta_display = pressure_delta_to_display(currentData.pressure_delta_3h);
@@ -471,15 +478,20 @@ void UiController::update_sensor_info_ui() {
 
             lv_color_t delta_3h_color = night_mode
                 ? color_card_border()
-                : getPressureDeltaColor(currentData.pressure_delta_3h, currentData.pressure_delta_3h_valid, false);
+                : getPressureDeltaColor(pressure_delta_to_msl_hpa(currentData.pressure_delta_3h),
+                                        currentData.pressure_delta_3h_valid,
+                                        false);
             lv_color_t delta_24h_color = night_mode
                 ? color_card_border()
-                : getPressureDeltaColor(currentData.pressure_delta_24h, currentData.pressure_delta_24h_valid, true);
+                : getPressureDeltaColor(pressure_delta_to_msl_hpa(currentData.pressure_delta_24h),
+                                        currentData.pressure_delta_24h_valid,
+                                        true);
             set_chip_color(objects.chip_delta_4, delta_3h_color);
             set_chip_color(objects.chip_delta_25, delta_24h_color);
             set_dot_color(objects.dot_sensor_info, delta_3h_color);
-            set_pressure_info_mode(pressure_graph_mode_);
-            if (pressure_graph_mode_ &&
+            const bool pressure_graph_available = pressure_altitude_is_set();
+            set_pressure_info_mode(pressure_graph_available && pressure_graph_mode_);
+            if (pressure_graph_available && pressure_graph_mode_ &&
                 should_refresh_active_graph(info_sensor, pressure_graph_range_, pressure_graph_points())) {
                 update_pressure_info_graph();
             }
@@ -492,6 +504,7 @@ void UiController::update_sensor_info_ui() {
 
     sync_threshold_dots_visibility();
     sync_info_graph_button_state();
+    sync_pressure_altitude_ui();
 }
 
 void UiController::restore_sensor_info_selection() {
@@ -745,13 +758,7 @@ void UiController::select_pressure_info(InfoSensor sensor) {
     set_checked_state(objects.btn_24h_pressure_info, sensor == INFO_PRESSURE_24H);
     set_pressure_info_mode(pressure_graph_mode_);
 
-    const char *title = nullptr;
-    if (objects.label_pressure_title_1) {
-        title = lv_label_get_text(objects.label_pressure_title_1);
-    } else {
-        title = "PRESSURE";
-    }
-    safe_label_set_text(objects.label_sensor_info_title, title);
+    safe_label_set_text(objects.label_sensor_info_title, UiText::LabelPressureTitle());
 
     update_sensor_info_ui();
 }
@@ -768,7 +775,14 @@ void UiController::set_visible(lv_obj_t *obj, bool visible) {
 }
 
 void UiController::hide_all_sensor_info_containers() {
+    pressure_altitude_overlay_open_ = false;
     release_all_sensor_graph_runtime_objects();
+    set_visible(objects.container_set_altitude, false);
+    set_visible(objects.btn_set_altitude, false);
+    set_visible(objects.label_sensor_info_title, true);
+    set_visible(objects.label_sensor_value, true);
+    set_visible(objects.dot_sensor_info, true);
+    set_visible(objects.label_sensor_info_unit, true);
     set_visible(objects.temperature_info, false);
     set_visible(objects.temperature_info_thresholds, false);
     set_visible(objects.temperature_info_graph, false);

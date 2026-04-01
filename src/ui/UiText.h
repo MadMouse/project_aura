@@ -187,6 +187,14 @@ inline const char *LabelBootDiagRtcLabel() { return UiStrings::text(UiStrings::T
 inline const char *LabelBootDiagErrorsDetected() { return UiStrings::text(UiStrings::TextId::LabelBootDiagErrorsDetected); }
 inline const char *LabelBootDiagShowErrors() { return UiStrings::text(UiStrings::TextId::LabelBootDiagShowErrors); }
 inline const char *LabelFwUpdateScreen() { return UiStrings::text(UiStrings::TextId::LabelFwUpdateScreen); }
+inline const char *LabelSetAltitudeButton() { return UiStrings::text(UiStrings::TextId::LabelSetAltitudeButton); }
+inline const char *LabelPressureSetAltitude() { return UiStrings::text(UiStrings::TextId::LabelPressureSetAltitude); }
+inline const char *LabelMslPressureInfo() { return UiStrings::text(UiStrings::TextId::LabelMslPressureInfo); }
+inline const char *LabelAltitudeAboveSeaLevel() { return UiStrings::text(UiStrings::TextId::LabelAltitudeAboveSeaLevel); }
+inline const char *LabelMslPressureFootnote() { return UiStrings::text(UiStrings::TextId::LabelMslPressureFootnote); }
+inline const char *LabelAbsPressureTitle() { return UiStrings::text(UiStrings::TextId::LabelAbsPressureTitle); }
+inline const char *LabelMslPressureTitle() { return UiStrings::text(UiStrings::TextId::LabelMslPressureTitle); }
+inline const char *LabelApplyButton() { return UiStrings::text(UiStrings::TextId::LabelApplyButton); }
 inline const char *BootDiagStorageOkConfig() { return UiStrings::text(UiStrings::TextId::BootDiagStorageOkConfig); }
 inline const char *BootDiagStorageOkDefaults() { return UiStrings::text(UiStrings::TextId::BootDiagStorageOkDefaults); }
 inline const char *BootDiagRecovered() { return UiStrings::text(UiStrings::TextId::BootDiagRecovered); }

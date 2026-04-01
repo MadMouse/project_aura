@@ -531,6 +531,8 @@ bool StorageManager::loadConfig() {
         readValue(ui, "led_indicators", loaded.led_indicators);
         readValue(ui, "alert_blink", loaded.alert_blink);
         readValue(ui, "asc_enabled", loaded.asc_enabled);
+        readValue(ui, "pressure_altitude_set", loaded.pressure_altitude_set);
+        readValue(ui, "pressure_altitude_m", loaded.pressure_altitude_m);
         readString(ui, "display_name", loaded.web_display_name);
         int lang_raw = static_cast<int>(Config::Language::EN);
         readValue(ui, "lang", lang_raw);
@@ -636,6 +638,8 @@ bool StorageManager::saveConfigInternal() {
     ui["led_indicators"] = config_.led_indicators;
     ui["alert_blink"] = config_.alert_blink;
     ui["asc_enabled"] = config_.asc_enabled;
+    ui["pressure_altitude_set"] = config_.pressure_altitude_set;
+    ui["pressure_altitude_m"] = config_.pressure_altitude_m;
     ui["display_name"] = config_.web_display_name;
     ui["lang"] = static_cast<uint8_t>(config_.language);
 

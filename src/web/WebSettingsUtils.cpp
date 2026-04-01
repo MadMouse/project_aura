@@ -58,6 +58,8 @@ void fill_unavailable(ArduinoJson::JsonObject settings) {
     settings["time_format_24h"] = nullptr;
     settings["temp_offset"] = nullptr;
     settings["hum_offset"] = nullptr;
+    settings["pressure_altitude_set"] = nullptr;
+    settings["pressure_altitude_m"] = nullptr;
     settings["ntp_server"] = nullptr;
     settings["display_name"] = nullptr;
 }
@@ -71,6 +73,8 @@ void fill_from_snapshot(ArduinoJson::JsonObject settings, const SettingsSnapshot
     settings["time_format_24h"] = snapshot.time_format_24h;
     settings["temp_offset"] = snapshot.temp_offset;
     settings["hum_offset"] = snapshot.hum_offset;
+    settings["pressure_altitude_set"] = snapshot.pressure_altitude_set;
+    settings["pressure_altitude_m"] = snapshot.pressure_altitude_m;
     settings["ntp_server"] = snapshot.ntp_server;
     settings["display_name"] = snapshot.display_name;
 }
@@ -84,6 +88,8 @@ void fill_from_config(ArduinoJson::JsonObject settings, const Config::StoredConf
     settings["time_format_24h"] = cfg.time_format_24h;
     settings["temp_offset"] = cfg.temp_offset;
     settings["hum_offset"] = cfg.hum_offset;
+    settings["pressure_altitude_set"] = cfg.pressure_altitude_set;
+    settings["pressure_altitude_m"] = cfg.pressure_altitude_m;
     settings["ntp_server"] = cfg.ntp_server;
     settings["display_name"] = cfg.web_display_name;
 }

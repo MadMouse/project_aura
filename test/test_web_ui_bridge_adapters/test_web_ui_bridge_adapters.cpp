@@ -16,6 +16,8 @@ void test_web_ui_bridge_adapters_capture_settings_snapshot_copies_fields() {
     snapshot.time_format_24h = false;
     snapshot.temp_offset = 1.5f;
     snapshot.hum_offset = -2.0f;
+    snapshot.pressure_altitude_set = true;
+    snapshot.pressure_altitude_m = 145;
     snapshot.ntp_server = "router.local";
     snapshot.display_name = "Aura";
 
@@ -31,6 +33,8 @@ void test_web_ui_bridge_adapters_capture_settings_snapshot_copies_fields() {
     TEST_ASSERT_FALSE(result.time_format_24h);
     TEST_ASSERT_EQUAL_FLOAT(1.5f, result.temp_offset);
     TEST_ASSERT_EQUAL_FLOAT(-2.0f, result.hum_offset);
+    TEST_ASSERT_TRUE(result.pressure_altitude_set);
+    TEST_ASSERT_EQUAL_INT16(145, result.pressure_altitude_m);
     TEST_ASSERT_EQUAL_STRING("router.local", result.ntp_server.c_str());
     TEST_ASSERT_EQUAL_STRING("Aura", result.display_name.c_str());
 }
