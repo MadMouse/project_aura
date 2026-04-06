@@ -360,6 +360,10 @@ void UiEventBinder::bindAvailableEvents(UiController &owner, int screen_id) {
         lv_obj_add_flag(objects.log_status, LV_OBJ_FLAG_CLICKABLE);
         lv_obj_set_ext_click_area(objects.log_status, kExtendedHitAreaPx);
     }
+    if (objectBelongsToScreen(objects.chip_rtc_status, screen_root)) {
+        lv_obj_add_flag(objects.chip_rtc_status, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_set_ext_click_area(objects.chip_rtc_status, kExtendedHitAreaPx);
+    }
 
     auto bind_events = [screen_root](const EventBinding *bindings, size_t count) {
         for (size_t i = 0; i < count; ++i) {

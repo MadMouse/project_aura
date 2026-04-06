@@ -321,6 +321,11 @@ void UiController::open_rtc_detection_overlay() {
     rtc_detection_saved_mode_ = storage.config().rtc_mode;
     rtc_detection_pending_mode_ = rtc_detection_saved_mode_;
     lv_obj_clear_flag(objects.container_rtc_detection, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(objects.container_rtc_detection, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_move_foreground(objects.container_rtc_detection);
+    if (objects.container_datetime_header) {
+        lv_obj_move_foreground(objects.container_datetime_header);
+    }
     datetime_ui_dirty = true;
 }
 
@@ -329,6 +334,7 @@ void UiController::close_rtc_detection_overlay() {
         return;
     }
     lv_obj_add_flag(objects.container_rtc_detection, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_clear_flag(objects.container_rtc_detection, LV_OBJ_FLAG_CLICKABLE);
     datetime_ui_dirty = true;
 }
 
