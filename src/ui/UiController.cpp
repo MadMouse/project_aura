@@ -1687,7 +1687,7 @@ lv_color_t UiController::night_alert_color(lv_color_t color) {
     }
     // Keep warning levels faint but still distinguishable at night.
     if (color.full == color_orange().full) {
-        return lv_color_mix(color_orange(), color_inactive(), 72);
+        return lv_color_mix(color_orange(), color_inactive(), 84);
     }
     if (color.full == color_yellow().full) {
         return lv_color_mix(color_yellow(), color_inactive(), 46);
